@@ -13,6 +13,7 @@ import {
   hydrateStoreState,
 } from "./store.js";
 import { readPersistedState, writePersistedState } from "./persistence.js";
+import { notifyTelegram, telegramStatus } from "./telegram.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const configPath = join(__dirname, "..", "config", "sources.json");
@@ -74,6 +75,11 @@ async function pollOne(source) {
     recordDailyImpressions(id, events);
     const added = upsertMany(events);
     if (added.length > 0) broadcastNew(added);
+    if (added.length > 0) {
+      notifyTelegram(added).catch((err) =>
+        console.warn(`[telegram] ${err instanceof Error ? err.message : String(err)}`)
+      );
+    }
     if (added.length > 0 || events.length > 0) schedulePersist();
     /** @type {string | null} */
     let note = null;
@@ -120,7 +126,13 @@ function sourcePollRank(source) {
   return 3;
 }
 
+function isFastStartupSource(source) {
+  const type = String(source.type || "");
+  return type !== "html-livewire" && type !== "paidcash-browser";
+}
+
 export function startPolling() {
+  console.log(`[telegram] ${telegramStatus()}`);
   const enabled = sources
     .filter((s) => s.enabled)
     .sort((a, b) => sourcePollRank(a) - sourcePollRank(b));
@@ -130,6 +142,9 @@ export function startPolling() {
     const seconds = Number(source.pollSeconds) || 20;
 
     pollOne(source);
+    if (isFastStartupSource(source)) {
+      setTimeout(() => pollOne(source), 7000);
+    }
     if (timers.has(id)) clearInterval(timers.get(id));
     timers.set(
       id,

@@ -11,6 +11,9 @@ Live Feed Hub is a Node/Express app in this folder. It aggregates public reward-
 ## Persistence / Netlify State
 
 - Local server data persists to `.data/live-feed-state.json` and is loaded on server start.
+- Local history now keeps up to 5000 events and exposes up to 30 pages of history, so old data remains visible after the PC/server is restarted.
+- Local startup does one extra fast refresh for non-browser sources after 7 seconds to bring first live rows in quicker.
+- Telegram bot alerts are optional. Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` before `npm start`; new live rows will be sent in batches. Without those vars, Telegram stays disabled and the app works normally.
 - Netlify deploy support was added with `netlify.toml` and `netlify/functions/api.js`.
 - Netlify Functions use `@netlify/blobs` through `src/persistence.js` so feed history survives function restarts and repeat visits.
 - Vercel deploy support was added with `vercel.json` and `api/index.js`.
@@ -53,6 +56,7 @@ Live Feed Hub is a Node/Express app in this folder. It aggregates public reward-
 - `src/adapters/auth-history-table.js`
 - `src/adapters/revno-dashboard.js`
 - `src/persistence.js`
+- `src/telegram.js`
 - `src/netlify-fetch-source.js`
 - `src/netlify-runtime.js`
 - `netlify/functions/api.js`

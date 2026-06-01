@@ -1,6 +1,6 @@
 export const PAGE_SIZE = 30;
-export const HISTORY_PAGES = 3;
-const MAX_EVENTS = PAGE_SIZE * HISTORY_PAGES * 12;
+export const HISTORY_PAGES = 30;
+const MAX_EVENTS = 5000;
 /** @type {Map<string, import('./types.js').FeedEvent>} */
 const byId = new Map();
 

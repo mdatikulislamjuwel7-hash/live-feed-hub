@@ -27,6 +27,33 @@ That file is ignored by git. Restarting the local server now loads old stored ev
 
 On Netlify, the same state is saved to Netlify Blobs from inside the serverless function. Netlify Blobs is meant for unstructured function data and supports `getStore`, `get`, and `setJSON`; updates can take up to about 60 seconds to propagate globally.
 
+## Telegram Bot Alerts
+
+The local server can send new live rows to a Telegram chat.
+
+1. Open Telegram and message `@BotFather`.
+2. Create a bot with `/newbot`.
+3. Copy the bot token.
+4. Send any message to your bot.
+5. Get your chat id by opening this URL in a browser:
+
+```text
+https://api.telegram.org/botYOUR_TOKEN/getUpdates
+```
+
+6. Start the server with environment variables:
+
+PowerShell:
+
+```powershell
+$env:TELEGRAM_BOT_TOKEN="YOUR_TOKEN"
+$env:TELEGRAM_CHAT_ID="YOUR_CHAT_ID"
+$env:TELEGRAM_BATCH_LIMIT="5"
+npm start
+```
+
+If those variables are not set, the app runs normally without Telegram messages.
+
 ## Netlify Deploy
 
 This repo includes:
