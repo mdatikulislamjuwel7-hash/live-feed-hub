@@ -1,0 +1,7 @@
+# ApuCash logged-in cookie (optional — more offer detail when logged in)
+# 1. Chrome → apucash.com → login
+# 2. F12 → Application → Cookies → copy laravel_session + XSRF-TOKEN
+# 3. Save as config/apucash.cookie (one line):
+# laravel_session=YOUR_VALUE; XSRF-TOKEN=YOUR_VALUE
+#
+# Or set env: APUCASH_COOKIE="laravel_session=...; XSRF-TOKEN=..."

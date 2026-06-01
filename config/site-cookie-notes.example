@@ -1,0 +1,21 @@
+# Optional authorized cookies
+#
+# Only paste cookies for accounts you own or have permission to use.
+# Do not paste other users' cookies. These are for future adapters where a
+# site shows more complete offer names only after your own login.
+#
+# Format:
+# cointo.co:
+#   config/cointo.cookie
+#
+# earng.net:
+#   config/earng.cookie
+#
+# gaincash.me:
+#   config/gaincash.cookie
+#
+# cashlyearn.com:
+#   config/cashlyearn.cookie
+#
+# Example cookie header:
+# XSRF-TOKEN=...; laravel_session=...

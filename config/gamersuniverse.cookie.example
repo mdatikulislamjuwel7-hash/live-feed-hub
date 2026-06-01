@@ -1,0 +1,22 @@
+# Gamers Universe — Live Completions (Offery) Hub-এ আনতে
+#
+# ১) https://gamersunivers.com/page/login.html এ লগইন করুন
+# ২) https://gamersunivers.com/page/live.html খুলুন (Live Completions দেখা যাচ্ছে কিনা চেক)
+# ৩) F12 → Application ট্যাব
+# ৪) বাম পাশে Storage → Cookies → https://gamersunivers.com  (ক্লিক করুন)
+#    ⚠️ "Private state tokens" নয় — সেখানে কিছু থাকবে না
+# ৫) ডান পাশে নাম/মান দেখবেন (যেমন PHPSESSID) — সব লাইন এক লাইনে:
+#    PHPSESSID=abc123; other_name=value
+# ৬) নিচে পেস্ট করুন, এই ফাইল কপি করে সংরক্ষণ:
+#    config/gamersuniverse.cookie
+# ৭) npm start রিস্টার্ট
+#
+# দ্রুত (Console ট্যাবে, live.html এ লগইন থাকা অবস্থায়):
+#   copy(document.cookie)
+# তারপর Notepad-এ পেস্ট → gamersuniverse.cookie ফাইলে সেভ
+
+# শুধু Domain = gamersunivers.com (Cloudflare / _ga কপি করবেন না)
+PHPSESSID=your_session_id_here
+SesHashKey=your_ses_hash_key
+SesToken=ses_id%3D5178604%26ses_key%3D...
+AccExist=your_account_id

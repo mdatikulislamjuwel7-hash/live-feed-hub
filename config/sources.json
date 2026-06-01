@@ -1,0 +1,138 @@
+[
+  {
+    "id": "apucash",
+    "name": "ApuCash",
+    "enabled": true,
+    "type": "html-livewire",
+    "url": "https://apucash.com",
+    "color": "#7c3aed",
+    "pollSeconds": 90,
+    "useBrowser": true
+  },
+  {
+    "id": "cashinstyle",
+    "name": "CashInStyle",
+    "enabled": true,
+    "type": "ticker-api",
+    "url": "https://cashinstyle.com/api/activity-ticker.json",
+    "color": "#0ea5e9",
+    "pollSeconds": 25
+  },
+  {
+    "id": "paidcash",
+    "name": "PaidCash",
+    "enabled": true,
+    "type": "paidcash-browser",
+    "url": "https://paidcash.co",
+    "color": "#10b981",
+    "pollSeconds": 45,
+    "blockOfferPatterns": ["MM Quiz", "Watch More"]
+  },
+  {
+    "id": "gamersuniverse",
+    "name": "Gamers Universe",
+    "enabled": true,
+    "type": "gamersuniverse-html",
+    "url": "https://gamersunivers.com/page/live.html",
+    "color": "#00b4ff",
+    "pollSeconds": 60,
+    "includePayouts": false
+  },
+  {
+    "id": "goldtasker",
+    "name": "GoldTasker",
+    "enabled": true,
+    "type": "json-feed",
+    "schema": "goldtasker",
+    "url": "https://goldtasker.com/api/live-offers",
+    "color": "#f59e0b",
+    "pollSeconds": 35
+  },
+  {
+    "id": "cashlyearn",
+    "name": "CashlyEarn Public",
+    "enabled": true,
+    "type": "cashlyearn-public",
+    "url": "https://cashlyearn.com/",
+    "color": "#14f195",
+    "pollSeconds": 120
+  },
+  {
+    "id": "lootycash",
+    "name": "LootyCash",
+    "enabled": true,
+    "type": "json-feed",
+    "schema": "lootycash",
+    "url": "https://lootycash.com/api/offers/completed",
+    "referer": "https://lootycash.com/",
+    "color": "#38bdf8",
+    "pollSeconds": 45
+  },
+  {
+    "id": "earnlab",
+    "name": "EarnLab",
+    "enabled": true,
+    "type": "json-feed",
+    "schema": "earnlab",
+    "url": "https://api.earnlab.com/activities",
+    "referer": "https://earnlab.com/",
+    "color": "#22c55e",
+    "pollSeconds": 45
+  },
+  {
+    "id": "lootgain",
+    "name": "LootGain",
+    "enabled": true,
+    "type": "graphql-feed",
+    "schema": "lootgain",
+    "url": "https://api.lootgain.com/graphql",
+    "origin": "https://lootgain.com",
+    "referer": "https://lootgain.com/",
+    "query": "query { getLiveRewards { id name user amount avatar } }",
+    "color": "#f97316",
+    "pollSeconds": 35
+  },
+  {
+    "id": "zxearn",
+    "name": "ZxEarn",
+    "enabled": true,
+    "type": "zxearn-html",
+    "url": "https://zxearn.com/",
+    "color": "#e11d48",
+    "pollSeconds": 75
+  },
+  {
+    "id": "earngift",
+    "name": "EarnGift",
+    "enabled": true,
+    "type": "live-table",
+    "url": "https://earngift.net/Live.php",
+    "color": "#a3e635",
+    "pollSeconds": 90,
+    "unit": "points",
+    "insecureTls": true
+  },
+  {
+    "id": "huntskin",
+    "name": "HuntSkin",
+    "enabled": true,
+    "type": "live-table",
+    "url": "https://huntskin.com/Liveoffersfinal/Live.php",
+    "color": "#fb7185",
+    "pollSeconds": 90,
+    "unit": "points"
+  },
+  {
+    "id": "revno",
+    "name": "Revno",
+    "enabled": true,
+    "type": "revno-dashboard",
+    "url": "https://revno.net/earn/",
+    "historyUrl": "https://revno.net/earn/history.php",
+    "cookieFile": "config/revno.cookie",
+    "color": "#f97316",
+    "pollSeconds": 120,
+    "withdrawLimit": 40,
+    "userLabel": "Revno account"
+  }
+]
