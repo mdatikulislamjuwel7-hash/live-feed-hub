@@ -16,8 +16,11 @@ export async function fetchPaidcash(source) {
     return await fetchPaidcashSocket(source);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.warn(`[paidcash] socket failed (${msg}), browser fallback`);
-    return withBrowserLock(() => fetchPaidcashBrowser(source));
+    if (source.useBrowserFallback === true) {
+      console.warn(`[paidcash] socket failed (${msg}), browser fallback`);
+      return withBrowserLock(() => fetchPaidcashBrowser(source));
+    }
+    throw new Error(`PaidCash socket failed: ${msg}`);
   }
 }
 
@@ -25,13 +28,11 @@ export async function fetchPaidcash(source) {
  * @param {Record<string, unknown>} source
  */
 async function fetchPaidcashSocket(source) {
-  const rows = await collectEarnFeed(9000, 3);
-  const profiles = await fetchUserDetailsBatch(
-    rows.map((r) => r.userId).filter(Boolean)
-  );
+  const rows = await collectEarnFeed(3000, 1);
+  const profiles = source.enrichProfiles === true
+    ? await fetchUserDetailsBatch(rows.map((r) => r.userId).filter(Boolean))
+    : new Map();
   const events = buildEvents(source, rows, profiles);
-  const named = events.filter((e) => e.offerName);
-  if (!named.length) throw new Error("socket rows missing offername");
   return events;
 }
 

@@ -41,7 +41,12 @@ async function fetchHtml(source, url) {
   });
 
   if (!res.ok) throw new Error(`${source.name}: HTTP ${res.status}`);
-  return res.text();
+  const html = await res.text();
+  const finalUrl = res.url || url;
+  if (finalUrl.includes("/login") || /Login to Your Account/i.test(html)) {
+    throw new Error(`${source.name}: session expired or login required`);
+  }
+  return html;
 }
 
 function parseHistory(source, html) {

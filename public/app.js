@@ -17,7 +17,7 @@ let activeSource = "all";
 let currentPage = 1;
 let totalPages = 1;
 let pageSize = 30;
-let historyPages = 3;
+let historyPages = 30;
 let lastServerlessRefresh = 0;
 
 const isServerlessHost =
@@ -107,7 +107,7 @@ function displayAmount(e) {
  * @param {FeedEvent} e
  */
 function offerLines(e) {
-  const normalizedOffer = String(e.offer || "").replace(/â†’|→/g, "->");
+  const normalizedOffer = String(e.offer || "").replace(/→/g, "->");
   const wall = e.offerwall || normalizedOffer.split(" -> ")[0]?.trim() || normalizedOffer || "Offer";
   let task = (e.offerName || "").trim();
   if (!task && normalizedOffer.includes(" -> ")) {
@@ -353,7 +353,9 @@ function renderHealth(sources) {
     .map((s) => {
       const h = s.health;
       const cls = h.status === "ok" ? "ok" : h.status === "error" ? "err" : "";
-      const detail = h.status === "ok" ? `${h.count} items` : h.lastError ? h.lastError.slice(0, 44) : "pending";
+      const latency = h.latencyMs ? `, ${(h.latencyMs / 1000).toFixed(1)}s` : "";
+      const added = h.added ? `, +${h.added}` : "";
+      const detail = h.status === "ok" ? `${h.count} items${added}${latency}` : h.lastError ? h.lastError.slice(0, 44) : "pending";
       const note = h.note ? `<div class="health-note" title="${escapeHtml(h.note)}">${escapeHtml(h.note)}</div>` : "";
       return `<div class="health-row"><span>${escapeHtml(s.name)}</span><span class="${cls}">${escapeHtml(detail)}</span></div>${note}`;
     })

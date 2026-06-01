@@ -7,7 +7,7 @@
     "url": "https://apucash.com",
     "color": "#7c3aed",
     "pollSeconds": 90,
-    "useBrowser": true
+    "useBrowser": false
   },
   {
     "id": "cashinstyle",

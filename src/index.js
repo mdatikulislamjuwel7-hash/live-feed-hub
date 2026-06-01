@@ -1,7 +1,7 @@
 import express from "express";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
-import { startPolling, getSources, getStats, loadPersistedStore } from "./aggregator.js";
+import { startPolling, getSources, getStats, loadPersistedStore, refreshAllSources } from "./aggregator.js";
 import {
   getEvents,
   getEventsPaginated,
@@ -55,6 +55,11 @@ app.get("/api/top-offers", (req, res) => {
 
 app.get("/api/sources", (_req, res) => {
   res.json({ sources: getSources(), stats: getStats() });
+});
+
+app.get("/api/refresh", async (_req, res) => {
+  const stats = await refreshAllSources();
+  res.json({ sources: getSources(), stats });
 });
 
 app.get("/api/stream", (req, res) => {

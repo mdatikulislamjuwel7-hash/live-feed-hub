@@ -26,6 +26,7 @@ export const sourceHealth = {};
 
 /** @type {Map<string, NodeJS.Timeout>} */
 const timers = new Map();
+const inFlight = new Set();
 
 let persistTimer = null;
 
@@ -55,6 +56,12 @@ function schedulePersist() {
  */
 async function pollOne(source) {
   const id = /** @type {string} */ (source.id);
+  if (inFlight.has(id)) {
+    console.log(`[${id}] skipped: previous poll still running`);
+    return;
+  }
+  inFlight.add(id);
+  const started = Date.now();
   try {
     const events = await fetchSource(source);
     if (id === "paidcash") {
@@ -98,9 +105,11 @@ async function pollOne(source) {
       lastOk: new Date().toISOString(),
       lastError: null,
       count: events.length,
+      added: added.length,
+      latencyMs: Date.now() - started,
       note,
     };
-    console.log(`[${id}] ${events.length} items, ${added.length} new`);
+    console.log(`[${id}] ${events.length} items, ${added.length} new, ${Date.now() - started}ms`);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     sourceHealth[id] = {
@@ -108,14 +117,26 @@ async function pollOne(source) {
       lastOk: sourceHealth[id]?.lastOk ?? null,
       lastError: message,
       count: 0,
+      added: 0,
+      latencyMs: Date.now() - started,
     };
     console.warn(`[${id}] ${message}`);
+  } finally {
+    inFlight.delete(id);
   }
 }
 
 export async function runInitialFetch() {
   const enabled = sources.filter((s) => s.enabled);
   await Promise.allSettled(enabled.map((s) => pollOne(s)));
+}
+
+export async function refreshAllSources() {
+  const enabled = sources
+    .filter((s) => s.enabled)
+    .sort((a, b) => sourcePollRank(a) - sourcePollRank(b));
+  await Promise.allSettled(enabled.map((s) => pollOne(s)));
+  return getStats();
 }
 
 function sourcePollRank(source) {

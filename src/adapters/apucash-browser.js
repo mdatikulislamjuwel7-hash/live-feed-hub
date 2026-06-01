@@ -49,9 +49,9 @@ async function fetchApucashRenderedHtmlLocked(url = "https://apucash.com") {
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     );
-    await page.goto(url, { waitUntil: "networkidle2", timeout: 45000 });
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
     await page.waitForSelector("#last_offers .offer-wrapper", { timeout: 20000 });
-    await new Promise((r) => setTimeout(r, 12000));
+    await new Promise((r) => setTimeout(r, 4500));
     let html = await page.content();
 
     const tickerUsers = extractTickerUsers(html);

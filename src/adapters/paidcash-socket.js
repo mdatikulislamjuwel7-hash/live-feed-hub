@@ -16,7 +16,7 @@ export function fetchEarnFeedOnce(waitMs = 10000) {
     const s = io(SOCKET_URL, {
       transports: ["websocket", "polling"],
       reconnection: false,
-      timeout: 20000,
+      timeout: 7000,
     });
 
     const finish = () => {
@@ -62,7 +62,7 @@ export function fetchEarnFeedOnce(waitMs = 10000) {
     const collectTimeout = setTimeout(finish, waitMs);
     const connectTimeout = setTimeout(
       () => fail(new Error("PaidCash socket connect timeout")),
-      25000
+      9000
     );
   });
 }
@@ -103,12 +103,12 @@ async function getDetailsSocket() {
     const s = io(SOCKET_URL, {
       transports: ["websocket", "polling"],
       reconnection: false,
-      timeout: 20000,
+      timeout: 7000,
     });
     const t = setTimeout(() => {
       s.close();
       reject(new Error("details socket timeout"));
-    }, 20000);
+    }, 9000);
     s.on("connect", () => {
       clearTimeout(t);
       detailsSocket = s;
@@ -152,8 +152,8 @@ export async function fetchUserDetailsBatch(userIds) {
   const s = await getDetailsSocket();
   const uniq = [...new Set(userIds.map(String))].slice(0, 12);
   const map = new Map();
-  for (const uid of uniq) {
-    const details = await fetchOneUserDetails(s, uid);
+  const rows = await Promise.all(uniq.map((uid) => fetchOneUserDetails(s, uid)));
+  for (const details of rows) {
     if (details) map.set(String(details.userId), details);
   }
   return map;
