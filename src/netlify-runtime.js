@@ -54,7 +54,8 @@ async function loadOnce() {
 export async function refreshNetlifyData({ force = false } = {}) {
   await loadOnce();
   const now = Date.now();
-  const minMs = Number(process.env.REFRESH_MIN_SECONDS || 45) * 1000;
+  const defaultRefreshSeconds = process.env.VERCEL ? 12 : 45;
+  const minMs = Number(process.env.REFRESH_MIN_SECONDS || defaultRefreshSeconds) * 1000;
   if (!force && now - lastRefreshAt < minMs) return;
   lastRefreshAt = now;
 

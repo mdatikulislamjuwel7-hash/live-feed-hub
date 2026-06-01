@@ -22,10 +22,12 @@ export default async function handler(req, res) {
   const path = url.pathname.replace(/^\/api\/?/, "/api/");
 
   if (path.startsWith("/api/stream")) {
+    await refreshNetlifyData({ force: true });
+    const payload = netlifyFeed(new URLSearchParams({ limit: "50" }));
     res.statusCode = 200;
     res.setHeader("content-type", "text/event-stream; charset=utf-8");
     res.setHeader("cache-control", "no-store");
-    res.end(`data: ${JSON.stringify({ type: "hello", data: [] })}\n\n`);
+    res.end(`data: ${JSON.stringify({ type: "hello", data: payload.events })}\n\n`);
     return;
   }
 

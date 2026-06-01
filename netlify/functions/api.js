@@ -21,13 +21,15 @@ export async function handler(event) {
   const path = url.pathname.replace(/^\/\.netlify\/functions\/api\/?/, "/api/");
 
   if (path.startsWith("/api/stream")) {
+    await refreshNetlifyData({ force: true });
+    const payload = netlifyFeed(new URLSearchParams({ limit: "50" }));
     return {
       statusCode: 200,
       headers: {
         "content-type": "text/event-stream; charset=utf-8",
         "cache-control": "no-store",
       },
-      body: `data: ${JSON.stringify({ type: "hello", data: [] })}\n\n`,
+      body: `data: ${JSON.stringify({ type: "hello", data: payload.events })}\n\n`,
     };
   }
 

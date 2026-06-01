@@ -18,6 +18,12 @@ let currentPage = 1;
 let totalPages = 1;
 let pageSize = 30;
 let historyPages = 3;
+let lastServerlessRefresh = 0;
+
+const isServerlessHost =
+  location.hostname.includes("vercel.app") ||
+  location.hostname.includes("netlify.app") ||
+  location.hostname.includes("netlifyglobalcdn.com");
 
 /** @type {Map<string, { name: string, color: string }>} */
 const sourceMeta = new Map();
@@ -115,6 +121,16 @@ function escapeHtml(s) {
   return d.innerHTML;
 }
 
+function withRefresh(params, force = false) {
+  if (!isServerlessHost) return params;
+  const now = Date.now();
+  if (force || now - lastServerlessRefresh > 12000) {
+    params.set("refresh", "1");
+    lastServerlessRefresh = now;
+  }
+  return params;
+}
+
 function renderTickerCard(e) {
   const color = sourceMeta.get(e.source)?.color || "#22d3a8";
   const { wall, task } = offerLines(e);
@@ -205,16 +221,24 @@ function renderPagination(pagination) {
   });
 }
 
-async function loadFeedPage(page = 1) {
+async function loadFeedPage(page = 1, opts = {}) {
   const params = new URLSearchParams({
     source: activeSource,
     page: String(page),
     pageSize: String(pageSize),
   });
+  withRefresh(params, Boolean(opts.forceRefresh));
   const res = await fetch(`/api/feed?${params}`);
   const data = await res.json();
   const list = data.events || [];
   const pag = data.pagination;
+
+  for (const s of data.sources || []) {
+    sourceMeta.set(s.id, { name: s.name, color: s.color || "#22d3a8" });
+  }
+  if (activeSource === "all" && list.length) {
+    mergeEvents(list, false, { skipReload: true });
+  }
 
   feedCount.textContent = pag ? `Page ${pag.page}/${pag.totalPages} · ${pag.total} events` : `${list.length} events`;
 
@@ -246,6 +270,7 @@ async function loadFeedPage(page = 1) {
 
 async function loadTopOffers() {
   const params = new URLSearchParams({ source: activeSource, limit: "8" });
+  withRefresh(params);
   const res = await fetch(`/api/top-offers?${params}`);
   const data = await res.json();
   const bySource = data.bySource || {};
@@ -328,7 +353,7 @@ function renderHealth(sources) {
 /**
  * @param {FeedEvent[]} events
  */
-function mergeEvents(events, prepend = false) {
+function mergeEvents(events, prepend = false, opts = {}) {
   if (!events.length) return;
   const map = new Map(allEvents.map((e) => [e.id, e]));
   for (const e of events) {
@@ -347,12 +372,17 @@ function mergeEvents(events, prepend = false) {
   allEvents = list.slice(0, 500);
   updateSummary(cachedSources);
   renderTicker();
-  if (currentPage === 1) loadFeedPage(1);
-  loadTopOffers();
+  if (currentPage === 1 && !opts.skipReload) loadFeedPage(1);
+  if (!opts.skipReload) loadTopOffers();
 }
 
 async function loadInitial() {
-  const bootstrap = await fetch(`/api/feed?source=${activeSource}&limit=${pageSize * historyPages}`);
+  const bootParams = new URLSearchParams({
+    source: activeSource,
+    limit: String(pageSize * historyPages),
+  });
+  withRefresh(bootParams, true);
+  const bootstrap = await fetch(`/api/feed?${bootParams}`);
   const bootData = await bootstrap.json();
   for (const s of bootData.sources) {
     sourceMeta.set(s.id, { name: s.name, color: s.color || "#22d3a8" });
@@ -363,7 +393,9 @@ async function loadInitial() {
   }
   allEvents = bootData.events || [];
 
-  const res = await fetch(`/api/feed?source=${activeSource}&page=1`);
+  const pageParams = new URLSearchParams({ source: activeSource, page: "1" });
+  withRefresh(pageParams);
+  const res = await fetch(`/api/feed?${pageParams}`);
   const data = await res.json();
   renderFilters(data.sources);
   renderHealth(data.sources);
@@ -375,6 +407,11 @@ async function loadInitial() {
 }
 
 function connectStream() {
+  if (isServerlessHost) {
+    statusDot.className = "status-dot live";
+    statusText.textContent = "Live refresh";
+    return;
+  }
   const es = new EventSource("/api/stream");
 
   es.onopen = () => {
@@ -404,7 +441,9 @@ function connectStream() {
 
 setInterval(async () => {
   try {
-    const res = await fetch("/api/sources");
+    const params = new URLSearchParams();
+    withRefresh(params);
+    const res = await fetch(`/api/sources${params.size ? `?${params}` : ""}`);
     const data = await res.json();
     renderHealth(data.sources);
     renderFilters(data.sources);
@@ -419,7 +458,7 @@ setInterval(async () => {
 }, 15000);
 
 setInterval(() => {
-  if (currentPage === 1) loadFeedPage(1);
-}, 60000);
+  if (currentPage === 1) loadFeedPage(1, { forceRefresh: isServerlessHost });
+}, isServerlessHost ? 15000 : 60000);
 
 loadInitial().then(connectStream);
