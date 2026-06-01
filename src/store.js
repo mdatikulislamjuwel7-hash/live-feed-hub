@@ -182,6 +182,13 @@ let impressionDay = "";
 /** @type {Map<string, Map<string, { offer: string, count: number }>>} */
 const dailyOfferCounts = new Map();
 
+function normalizeText(value) {
+  return String(value ?? "")
+    .replace(/â†’|→/g, "->")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -206,10 +213,10 @@ export function recordDailyImpressions(sourceId, events) {
   for (const ev of events) {
     const label =
       typeof ev === "string"
-        ? ev
+        ? normalizeText(ev)
         : ev.offerName
-          ? `${ev.offerwall || ""} → ${ev.offerName}`.replace(/^ → /, "")
-          : ev.offer || ev.offerwall || "";
+          ? normalizeText(`${ev.offerwall || ""} -> ${ev.offerName}`.replace(/^ -> /, ""))
+          : normalizeText(ev.offer || ev.offerwall || "");
     const key = label.toLowerCase().trim();
     if (!key) continue;
     const row = bucket.get(key);
@@ -289,11 +296,15 @@ export function hydrateStoreState(state) {
     ordered.push(event);
   }
   impressionDay = typeof state.impressionDay === "string" ? state.impressionDay : "";
+  rebuildDailyOfferCounts();
+}
+
+function rebuildDailyOfferCounts() {
+  impressionDay = todayKey();
   dailyOfferCounts.clear();
-  if (state.dailyOfferCounts && typeof state.dailyOfferCounts === "object") {
-    for (const [sourceId, entries] of Object.entries(state.dailyOfferCounts)) {
-      if (Array.isArray(entries)) dailyOfferCounts.set(sourceId, new Map(entries));
-    }
+  for (const ev of ordered) {
+    if (!ev?.at || !String(ev.at).startsWith(impressionDay)) continue;
+    recordDailyImpressions(ev.source, [ev]);
   }
 }
 

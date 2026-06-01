@@ -31,6 +31,7 @@ const sourceMeta = new Map();
 let allEvents = [];
 /** @type {Array<Record<string, any>>} */
 let cachedSources = [];
+let latestStats = { total: 0, sources: {} };
 
 /**
  * @typedef {Object} FeedEvent
@@ -106,10 +107,11 @@ function displayAmount(e) {
  * @param {FeedEvent} e
  */
 function offerLines(e) {
-  const wall = e.offerwall || e.offer?.split(" -> ")[0]?.trim() || e.offer || "Offer";
+  const normalizedOffer = String(e.offer || "").replace(/â†’|→/g, "->");
+  const wall = e.offerwall || normalizedOffer.split(" -> ")[0]?.trim() || normalizedOffer || "Offer";
   let task = (e.offerName || "").trim();
-  if (!task && e.offer?.includes(" -> ")) {
-    const part = e.offer.split(" -> ").slice(1).join(" -> ").trim();
+  if (!task && normalizedOffer.includes(" -> ")) {
+    const part = normalizedOffer.split(" -> ").slice(1).join(" -> ").trim();
     if (part && !part.startsWith("@")) task = part;
   }
   return { wall, task };
@@ -134,12 +136,12 @@ function withRefresh(params, force = false) {
 function renderTickerCard(e) {
   const color = sourceMeta.get(e.source)?.color || "#22d3a8";
   const { wall, task } = offerLines(e);
-  const country = e.country ? ` · ${e.country}` : "";
+  const country = e.country ? ` - ${e.country}` : "";
   const priv = e.isPrivate ? "Private " : "";
   return `<div class="ticker-card" style="--src-color:${color}">
     <span class="src">${escapeHtml(e.sourceName)}</span>
     <span class="user">${escapeHtml(e.user)}${escapeHtml(country)}</span>
-    <span class="offer"><strong>${escapeHtml(priv + wall)}</strong>${task ? ` · <em>${escapeHtml(task)}</em>` : ""}</span>
+    <span class="offer"><strong>${escapeHtml(priv + wall)}</strong>${task ? ` - <em>${escapeHtml(task)}</em>` : ""}</span>
     <span class="amt">${escapeHtml(displayAmount(e))}</span>
     <span class="time-mini">${escapeHtml(formatTimeRelative(e.at))}</span>
   </div>`;
@@ -207,7 +209,7 @@ function renderPagination(pagination) {
     <button type="button" class="page-btn" data-page="prev" ${pagination.hasPrev ? "" : "disabled"}>Prev</button>
     ${buttons.join("")}
     <button type="button" class="page-btn" data-page="next" ${pagination.hasNext ? "" : "disabled"}>Next</button>
-    <span class="page-info">${pagination.total} total · ${pageSize}/page</span>
+    <span class="page-info">${pagination.total} total - ${pageSize}/page</span>
   `;
 
   paginationEl.querySelectorAll(".page-btn").forEach((btn) => {
@@ -232,6 +234,7 @@ async function loadFeedPage(page = 1, opts = {}) {
   const data = await res.json();
   const list = data.events || [];
   const pag = data.pagination;
+  latestStats = data.stats || latestStats;
 
   for (const s of data.sources || []) {
     sourceMeta.set(s.id, { name: s.name, color: s.color || "#22d3a8" });
@@ -240,7 +243,7 @@ async function loadFeedPage(page = 1, opts = {}) {
     mergeEvents(list, false, { skipReload: true });
   }
 
-  feedCount.textContent = pag ? `Page ${pag.page}/${pag.totalPages} · ${pag.total} events` : `${list.length} events`;
+  feedCount.textContent = pag ? `Page ${pag.page}/${pag.totalPages} - ${pag.total} events` : `${list.length} events`;
 
   if (!list.length) {
     const current = shortSourceName(activeSource);
@@ -308,10 +311,17 @@ async function loadTopOffers() {
 function renderFilters(sources) {
   cachedSources = sources;
   updateSummary(sources);
-  const totalCount = sources.reduce((sum, s) => sum + Number(s.health?.count || 0), 0);
+  const statsBySource = latestStats.sources || {};
+  const totalCount = Number(latestStats.total || 0) ||
+    sources.reduce((sum, s) => sum + Number(s.health?.count || 0), 0);
   const buttons = [
     { id: "all", name: "All sites", color: "#22d3a8", count: totalCount },
-    ...sources.map((s) => ({ id: s.id, name: s.name, color: s.color, count: s.health?.count ?? 0 })),
+    ...sources.map((s) => ({
+      id: s.id,
+      name: s.name,
+      color: s.color,
+      count: statsBySource[s.id] ?? s.health?.count ?? 0,
+    })),
   ];
 
   sourceFilters.innerHTML = buttons
@@ -384,6 +394,7 @@ async function loadInitial() {
   withRefresh(bootParams, true);
   const bootstrap = await fetch(`/api/feed?${bootParams}`);
   const bootData = await bootstrap.json();
+  latestStats = bootData.stats || latestStats;
   for (const s of bootData.sources) {
     sourceMeta.set(s.id, { name: s.name, color: s.color || "#22d3a8" });
   }
@@ -397,6 +408,7 @@ async function loadInitial() {
   withRefresh(pageParams);
   const res = await fetch(`/api/feed?${pageParams}`);
   const data = await res.json();
+  latestStats = data.stats || latestStats;
   renderFilters(data.sources);
   renderHealth(data.sources);
   renderTicker();
@@ -445,6 +457,7 @@ setInterval(async () => {
     withRefresh(params);
     const res = await fetch(`/api/sources${params.size ? `?${params}` : ""}`);
     const data = await res.json();
+    latestStats = data.stats || latestStats;
     renderHealth(data.sources);
     renderFilters(data.sources);
     statusDot.className = "status-dot live";

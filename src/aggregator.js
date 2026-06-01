@@ -72,8 +72,8 @@ async function pollOne(source) {
         }
       }
     }
-    recordDailyImpressions(id, events);
     const added = upsertMany(events);
+    recordDailyImpressions(id, added);
     if (added.length > 0) broadcastNew(added);
     if (added.length > 0) {
       notifyTelegram(added).catch((err) =>
