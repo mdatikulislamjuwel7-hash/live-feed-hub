@@ -81,11 +81,12 @@ function shortSourceName(id) {
 function updateSummary(sources = cachedSources, pagination = null) {
   const list = Array.isArray(sources) ? sources : [];
   const online = list.filter((s) => s.health?.status === "ok").length;
-  const total = pagination?.total ?? allEvents.length;
+  const currentList = filteredEvents();
+  const total = pagination?.total ?? currentList.length;
   summaryEvents.textContent = String(total);
   summaryOnline.textContent = `${online}/${list.length || 0}`;
   summaryView.textContent = shortSourceName(activeSource);
-  summaryLast.textContent = allEvents[0]?.at ? formatTimeRelative(allEvents[0].at) : "Waiting";
+  summaryLast.textContent = currentList[0]?.at ? formatTimeRelative(currentList[0].at) : "Waiting";
   sourceTotal.textContent = String(list.length || 0);
 }
 
@@ -218,7 +219,23 @@ async function loadFeedPage(page = 1) {
   feedCount.textContent = pag ? `Page ${pag.page}/${pag.totalPages} · ${pag.total} events` : `${list.length} events`;
 
   if (!list.length) {
-    feedList.innerHTML = '<li class="empty">No history on this page yet.</li>';
+    const current = shortSourceName(activeSource);
+    const message =
+      activeSource === "all"
+        ? "No history on this page yet."
+        : `${current} has no visible rows right now. Show all sites to see the live feed.`;
+    feedList.innerHTML = `<li class="empty">
+      <p>${escapeHtml(message)}</p>
+      ${activeSource === "all" ? "" : '<button type="button" class="empty-action" id="showAllFeed">Show all sites</button>'}
+    </li>`;
+    document.getElementById("showAllFeed")?.addEventListener("click", async () => {
+      activeSource = "all";
+      currentPage = 1;
+      renderFilters(cachedSources);
+      renderTicker();
+      await loadFeedPage(1);
+      await loadTopOffers();
+    });
   } else {
     feedList.innerHTML = list.map(renderFeedItem).join("");
   }
@@ -351,6 +368,8 @@ async function loadInitial() {
   renderFilters(data.sources);
   renderHealth(data.sources);
   renderTicker();
+  statusDot.className = "status-dot live";
+  statusText.textContent = "Loaded";
   await loadFeedPage(1);
   await loadTopOffers();
 }
@@ -389,6 +408,10 @@ setInterval(async () => {
     const data = await res.json();
     renderHealth(data.sources);
     renderFilters(data.sources);
+    statusDot.className = "status-dot live";
+    if (statusText.textContent === "Connecting..." || statusText.textContent === "Reconnecting...") {
+      statusText.textContent = "Loaded";
+    }
     await loadTopOffers();
   } catch {
     /* ignore transient refresh errors */

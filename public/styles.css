@@ -721,6 +721,25 @@ body::-webkit-scrollbar-thumb {
   text-align: center;
 }
 
+.empty p {
+  margin: 0 0 0.85rem;
+}
+
+.empty-action {
+  min-height: 2.35rem;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--ok-bg);
+  color: #b8fff4;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.empty-action:hover {
+  background: rgba(45, 212, 191, 0.18);
+}
+
 @media (max-width: 1080px) {
   .layout {
     grid-template-columns: 1fr;
