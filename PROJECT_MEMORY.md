@@ -13,8 +13,11 @@ Live Feed Hub is a Node/Express app in this folder. It aggregates public reward-
 - Local server data persists to `.data/live-feed-state.json` and is loaded on server start.
 - Netlify deploy support was added with `netlify.toml` and `netlify/functions/api.js`.
 - Netlify Functions use `@netlify/blobs` through `src/persistence.js` so feed history survives function restarts and repeat visits.
+- Vercel deploy support was added with `vercel.json` and `api/index.js`.
+- Vercel Functions use `@vercel/blob` through `src/persistence.js` when `BLOB_READ_WRITE_TOKEN` is configured. Set `LIVE_FEED_STATE_BLOB_URL` after first save so cold starts can read the same persisted JSON.
 - Netlify skips browser-only adapters (`html-livewire`, `paidcash-browser`) to keep free functions lightweight. Public/API/table sources remain supported.
-- Set `REVNO_COOKIE` in Netlify environment variables if Revno authenticated data should work online.
+- Netlify/Vercel skip browser-only adapters (`html-livewire`, `paidcash-browser`) to keep free functions lightweight. Public/API/table sources remain supported.
+- Set `REVNO_COOKIE` in deployment environment variables if Revno authenticated data should work online.
 
 ## Current Working Sources
 
@@ -54,6 +57,8 @@ Live Feed Hub is a Node/Express app in this folder. It aggregates public reward-
 - `src/netlify-runtime.js`
 - `netlify/functions/api.js`
 - `netlify.toml`
+- `api/index.js`
+- `vercel.json`
 - `config/site-cookie-notes.example`
 
 ## Run Commands

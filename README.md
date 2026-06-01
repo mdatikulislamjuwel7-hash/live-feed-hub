@@ -1,6 +1,6 @@
 # Live Feed Hub
 
-Reward activity dashboard for public/live earning feeds. It runs locally with an Express server and can also be deployed to Netlify using serverless functions.
+Reward activity dashboard for public/live earning feeds. It runs locally with an Express server and can also be deployed to Netlify or Vercel using serverless functions.
 
 ## Local Run
 
@@ -56,6 +56,40 @@ Netlify routes:
 ```
 
 The Netlify version fetches and stores data when visitors hit the API. It skips browser-only adapters such as ApuCash browser rendering and PaidCash browser fallback so the free function stays lightweight.
+
+## Vercel Deploy
+
+This repo also includes:
+
+```text
+vercel.json
+api/index.js
+```
+
+Deploy steps:
+
+1. Push this folder to GitHub.
+2. In Vercel, import the GitHub repository.
+3. Framework preset: `Other`.
+4. Build command: leave empty or use Vercel default.
+5. Output directory: `public`.
+6. Add optional environment variables:
+   - `BLOB_READ_WRITE_TOKEN` if using Vercel Blob persistence.
+   - `LIVE_FEED_STATE_BLOB_URL` after the first blob save, so future cold starts can read the same JSON file.
+   - `REVNO_COOKIE` for Revno authenticated dashboard data.
+   - `REFRESH_MIN_SECONDS` to control minimum refresh interval. Default is `45`.
+7. Deploy.
+
+Vercel routes:
+
+```text
+/api/feed
+/api/sources
+/api/top-offers
+/api/stream
+```
+
+The Vercel version works like the Netlify version: it refreshes data when visitors hit the API and stores history in Vercel Blob when `BLOB_READ_WRITE_TOKEN` is configured. It skips browser-only adapters so the free function remains deployable.
 
 ## Current Sources
 
