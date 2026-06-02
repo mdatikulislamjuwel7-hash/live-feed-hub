@@ -149,6 +149,8 @@
     "enabled": true,
     "type": "splitdrop-public",
     "url": "https://splitdrop.com/offers.html",
+    "cookieFile": "config/splitdrop.cookie",
+    "cookieEnv": "SPLITDROP_COOKIE",
     "color": "#22c55e",
     "pollSeconds": 120,
     "limit": 30

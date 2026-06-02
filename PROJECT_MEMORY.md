@@ -38,7 +38,7 @@ Live Feed Hub is a Node/Express app in this folder. It aggregates public reward-
 - HuntSkin: public `Liveoffersfinal/Live.php` table.
 - PaidByte: public `https://api.paidbyte.com/api/leads/live` with global activity fallback.
 - TrevBucks: public homepage Livewire `user.live-cashouts` lazy component.
-- Splitdrop: public `offers.html` featured offer cards. Guest live/recent-earner routes return 403/500 or empty content, so do not bypass them.
+- Splitdrop: logged-in `recentEarners` AJAX route with `config/splitdrop.cookie` or `SPLITDROP_COOKIE`; falls back to public `offers.html` featured offer cards. Guest live/recent-earner routes return 403/500 or empty content, so do not bypass them.
 - Revno: authenticated dashboard parser using locally stored user-provided cookies. It reads history rows when present, latest dashboard withdrawals, and visible offerwall partner boost cards.
 
 ## Pending / Needs Authorized Account Data

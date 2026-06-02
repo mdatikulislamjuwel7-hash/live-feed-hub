@@ -70,6 +70,7 @@ Deploy steps:
 3. Use the default settings from `netlify.toml`.
 4. Add optional environment variables:
    - `REVNO_COOKIE` for Revno authenticated dashboard data.
+   - `SPLITDROP_COOKIE` for Splitdrop logged-in recent earners.
    - `REFRESH_MIN_SECONDS` to control minimum refresh interval. Default is `45`.
 5. Deploy.
 
@@ -104,6 +105,7 @@ Deploy steps:
    - `BLOB_READ_WRITE_TOKEN` if using Vercel Blob persistence.
    - `LIVE_FEED_STATE_BLOB_URL` after the first blob save, so future cold starts can read the same JSON file.
    - `REVNO_COOKIE` for Revno authenticated dashboard data.
+   - `SPLITDROP_COOKIE` for Splitdrop logged-in recent earners.
    - `REFRESH_MIN_SECONDS` to control minimum refresh interval. Default is `45`.
 7. Deploy.
 
@@ -134,7 +136,7 @@ The Vercel version works like the Netlify version: it refreshes data when visito
 - HuntSkin: public `Liveoffersfinal/Live.php` table.
 - PaidByte: public live leads API.
 - TrevBucks: public Livewire cashout ticker.
-- Splitdrop: public featured offers page. Guest live/recent-earner routes are not publicly exposed.
+- Splitdrop: logged-in recent earners when a valid cookie is available; otherwise public featured offers page.
 - Revno: authenticated dashboard parser when cookie is valid.
 
 ## Notes
