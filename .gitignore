@@ -4,4 +4,5 @@ node_modules/
 config/apucash.cookie
 config/gamersuniverse.cookie
 config/revno.cookie
+config/splitdrop.cookie
 *.log
