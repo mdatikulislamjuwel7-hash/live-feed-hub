@@ -144,6 +144,16 @@
     "limit": 30
   },
   {
+    "id": "splitdrop",
+    "name": "Splitdrop",
+    "enabled": true,
+    "type": "splitdrop-public",
+    "url": "https://splitdrop.com/offers.html",
+    "color": "#22c55e",
+    "pollSeconds": 120,
+    "limit": 30
+  },
+  {
     "id": "revno",
     "name": "Revno",
     "enabled": true,

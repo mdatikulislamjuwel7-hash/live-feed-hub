@@ -134,6 +134,7 @@ The Vercel version works like the Netlify version: it refreshes data when visito
 - HuntSkin: public `Liveoffersfinal/Live.php` table.
 - PaidByte: public live leads API.
 - TrevBucks: public Livewire cashout ticker.
+- Splitdrop: public featured offers page. Guest live/recent-earner routes are not publicly exposed.
 - Revno: authenticated dashboard parser when cookie is valid.
 
 ## Notes

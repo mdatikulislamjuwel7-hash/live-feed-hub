@@ -27,6 +27,8 @@ export async function fetchNetlifySource(source) {
       return (await import("./adapters/paidbyte-public.js")).fetchPaidBytePublic(source);
     case "trevbucks-livewire":
       return (await import("./adapters/trevbucks-livewire.js")).fetchTrevbucksLivewire(source);
+    case "splitdrop-public":
+      return (await import("./adapters/splitdrop-public.js")).fetchSplitdropPublic(source);
     default:
       throw new Error(`Netlify does not support adapter type: ${source.type}`);
   }
