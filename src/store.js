@@ -7,6 +7,15 @@ const byId = new Map();
 /** @type {import('./types.js').FeedEvent[]} */
 let ordered = [];
 
+function timeValue(event) {
+  const time = Date.parse(String(event?.at || ""));
+  return Number.isFinite(time) ? time : 0;
+}
+
+function sortNewestFirst(list) {
+  return list.sort((a, b) => timeValue(b) - timeValue(a));
+}
+
 /**
  * Backfill offer/country on older PaidCash rows (same user + wall + amount).
  * @param {import('./types.js').FeedEvent} incoming
@@ -89,6 +98,7 @@ export function upsertMany(events) {
       }
     }
   }
+  sortNewestFirst(ordered);
   return added;
 }
 
@@ -139,9 +149,9 @@ export function getEvents(opts = {}) {
  */
 function getFilteredList(source) {
   if (source && source !== "all") {
-    return ordered.filter((e) => e.source === source);
+    return sortNewestFirst(ordered.filter((e) => e.source === source));
   }
-  return ordered;
+  return sortNewestFirst([...ordered]);
 }
 
 /**
@@ -268,7 +278,7 @@ export function getStats() {
   return {
     total: ordered.length,
     sources,
-    lastUpdated: ordered[0]?.at ?? null,
+    lastUpdated: sortNewestFirst([...ordered])[0]?.at ?? null,
   };
 }
 
@@ -280,7 +290,7 @@ export function exportStoreState() {
   return {
     version: 1,
     savedAt: new Date().toISOString(),
-    events: ordered,
+    events: sortNewestFirst([...ordered]),
     impressionDay,
     dailyOfferCounts: daily,
   };
@@ -295,6 +305,7 @@ export function hydrateStoreState(state) {
     byId.set(event.id, event);
     ordered.push(event);
   }
+  sortNewestFirst(ordered);
   impressionDay = typeof state.impressionDay === "string" ? state.impressionDay : "";
   rebuildDailyOfferCounts();
 }
