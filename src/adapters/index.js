@@ -10,6 +10,7 @@ import { fetchLiveTable } from "./live-table.js";
 import { fetchAuthHistoryTable } from "./auth-history-table.js";
 import { fetchRevnoDashboard } from "./revno-dashboard.js";
 import { fetchPaidBytePublic } from "./paidbyte-public.js";
+import { fetchTrevbucksLivewire } from "./trevbucks-livewire.js";
 
 /** @type {Record<string, (source: Record<string, unknown>) => Promise<import('../types.js').FeedEvent[]>>} */
 const handlers = {
@@ -25,6 +26,7 @@ const handlers = {
   "auth-history-table": fetchAuthHistoryTable,
   "revno-dashboard": fetchRevnoDashboard,
   "paidbyte-public": fetchPaidBytePublic,
+  "trevbucks-livewire": fetchTrevbucksLivewire,
 };
 
 /**

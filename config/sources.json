@@ -134,6 +134,16 @@
     "limit": 50
   },
   {
+    "id": "trevbucks",
+    "name": "TrevBucks",
+    "enabled": true,
+    "type": "trevbucks-livewire",
+    "url": "https://trevbucks.com/",
+    "color": "#facc15",
+    "pollSeconds": 90,
+    "limit": 30
+  },
+  {
     "id": "revno",
     "name": "Revno",
     "enabled": true,

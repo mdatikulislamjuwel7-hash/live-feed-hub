@@ -133,6 +133,7 @@ The Vercel version works like the Netlify version: it refreshes data when visito
 - EarnGift: public `Live.php` table.
 - HuntSkin: public `Liveoffersfinal/Live.php` table.
 - PaidByte: public live leads API.
+- TrevBucks: public Livewire cashout ticker.
 - Revno: authenticated dashboard parser when cookie is valid.
 
 ## Notes

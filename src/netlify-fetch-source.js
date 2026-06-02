@@ -25,6 +25,8 @@ export async function fetchNetlifySource(source) {
       return (await import("./adapters/revno-dashboard.js")).fetchRevnoDashboard(source);
     case "paidbyte-public":
       return (await import("./adapters/paidbyte-public.js")).fetchPaidBytePublic(source);
+    case "trevbucks-livewire":
+      return (await import("./adapters/trevbucks-livewire.js")).fetchTrevbucksLivewire(source);
     default:
       throw new Error(`Netlify does not support adapter type: ${source.type}`);
   }
