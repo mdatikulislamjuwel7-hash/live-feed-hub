@@ -36,6 +36,7 @@ Live Feed Hub is a Node/Express app in this folder. It aggregates public reward-
 - ZxEarn: public homepage HTML tooltip parsing.
 - EarnGift: public `Live.php` table. Uses insecure TLS only because the site certificate is expired.
 - HuntSkin: public `Liveoffersfinal/Live.php` table.
+- PaidByte: public `https://api.paidbyte.com/api/leads/live` with global activity fallback.
 - Revno: authenticated dashboard parser using locally stored user-provided cookies. It reads history rows when present, latest dashboard withdrawals, and visible offerwall partner boost cards.
 
 ## Pending / Needs Authorized Account Data
@@ -55,6 +56,7 @@ Live Feed Hub is a Node/Express app in this folder. It aggregates public reward-
 - `src/adapters/live-table.js`
 - `src/adapters/auth-history-table.js`
 - `src/adapters/revno-dashboard.js`
+- `src/adapters/paidbyte-public.js`
 - `src/persistence.js`
 - `src/telegram.js`
 - `src/netlify-fetch-source.js`

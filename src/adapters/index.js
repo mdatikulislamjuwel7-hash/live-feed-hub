@@ -9,6 +9,7 @@ import { fetchCashlyearnPublic } from "./cashlyearn-public.js";
 import { fetchLiveTable } from "./live-table.js";
 import { fetchAuthHistoryTable } from "./auth-history-table.js";
 import { fetchRevnoDashboard } from "./revno-dashboard.js";
+import { fetchPaidBytePublic } from "./paidbyte-public.js";
 
 /** @type {Record<string, (source: Record<string, unknown>) => Promise<import('../types.js').FeedEvent[]>>} */
 const handlers = {
@@ -23,6 +24,7 @@ const handlers = {
   "live-table": fetchLiveTable,
   "auth-history-table": fetchAuthHistoryTable,
   "revno-dashboard": fetchRevnoDashboard,
+  "paidbyte-public": fetchPaidBytePublic,
 };
 
 /**

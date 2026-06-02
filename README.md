@@ -132,6 +132,7 @@ The Vercel version works like the Netlify version: it refreshes data when visito
 - ZxEarn: public homepage parser.
 - EarnGift: public `Live.php` table.
 - HuntSkin: public `Liveoffersfinal/Live.php` table.
+- PaidByte: public live leads API.
 - Revno: authenticated dashboard parser when cookie is valid.
 
 ## Notes

@@ -123,6 +123,17 @@
     "unit": "points"
   },
   {
+    "id": "paidbyte",
+    "name": "PaidByte",
+    "enabled": true,
+    "type": "paidbyte-public",
+    "url": "https://api.paidbyte.com/api/leads/live",
+    "fallbackUrl": "https://api.paidbyte.com/api/statistics/global-activity",
+    "color": "#38bdf8",
+    "pollSeconds": 30,
+    "limit": 50
+  },
+  {
     "id": "revno",
     "name": "Revno",
     "enabled": true,
