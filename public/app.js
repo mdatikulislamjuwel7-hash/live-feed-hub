@@ -375,12 +375,14 @@ function mergeEvents(events, prepend = false, opts = {}) {
   let list = [...map.values()];
   if (prepend) {
     const newIds = new Set(events.map((e) => e.id));
-    const head = events.map((e) => map.get(e.id)).filter(Boolean);
+    const head = events
+      .map((e) => map.get(e.id))
+      .filter(Boolean)
+      .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
     const rest = list.filter((e) => !newIds.has(e.id));
     list = [...head, ...rest];
-  } else {
-    list.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
   }
+  list.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
   allEvents = list.slice(0, 500);
   updateSummary(cachedSources);
   renderTicker();
