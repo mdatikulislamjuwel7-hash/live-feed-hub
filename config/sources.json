@@ -156,6 +156,17 @@
     "limit": 30
   },
   {
+    "id": "earnfino",
+    "name": "Earnfino",
+    "enabled": true,
+    "type": "earnfino-leaderboard",
+    "url": "https://earnfino.com/api/leaderboard",
+    "referer": "https://earnfino.com/leaderboard",
+    "color": "#06b6d4",
+    "pollSeconds": 60,
+    "limit": 40
+  },
+  {
     "id": "revno",
     "name": "Revno",
     "enabled": true,

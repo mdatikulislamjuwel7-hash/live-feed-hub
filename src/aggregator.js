@@ -80,7 +80,7 @@ async function pollOne(source) {
       }
     }
     const added = upsertMany(events);
-    recordDailyImpressions(id, added);
+    recordDailyImpressions(id, events);
     if (added.length > 0) broadcastNew(added);
     if (added.length > 0) {
       notifyTelegram(added).catch((err) =>
@@ -98,7 +98,13 @@ async function pollOne(source) {
       )
     ) {
       note =
-        "শুধু পাবলিক payouts — Live Completions (Offery) এর জন্য config/gamersuniverse.cookie";
+        "Only public payouts are visible. Add a fresh config/gamersuniverse.cookie for Live Completions.";
+    } else if (
+      id === "gamersuniverse" &&
+      events.length === 0 &&
+      source.includePayouts === false
+    ) {
+      note = "No completion rows right now; payout rows are hidden by config.";
     }
     sourceHealth[id] = {
       status: "ok",

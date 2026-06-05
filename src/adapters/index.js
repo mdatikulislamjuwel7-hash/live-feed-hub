@@ -12,6 +12,7 @@ import { fetchRevnoDashboard } from "./revno-dashboard.js";
 import { fetchPaidBytePublic } from "./paidbyte-public.js";
 import { fetchTrevbucksLivewire } from "./trevbucks-livewire.js";
 import { fetchSplitdropPublic } from "./splitdrop-public.js";
+import { fetchEarnfinoLeaderboard } from "./earnfino-leaderboard.js";
 
 /** @type {Record<string, (source: Record<string, unknown>) => Promise<import('../types.js').FeedEvent[]>>} */
 const handlers = {
@@ -29,6 +30,7 @@ const handlers = {
   "paidbyte-public": fetchPaidBytePublic,
   "trevbucks-livewire": fetchTrevbucksLivewire,
   "splitdrop-public": fetchSplitdropPublic,
+  "earnfino-leaderboard": fetchEarnfinoLeaderboard,
 };
 
 /**
