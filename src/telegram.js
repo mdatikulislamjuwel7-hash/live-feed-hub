@@ -449,6 +449,18 @@ function formatAutoTopReport(data, sources = [], title = "📌 HOURLY TOP REPORT
   ].join("\n");
 }
 
+function formatEmptyTopReport(title = "📌 HOURLY TOP REPORT") {
+  return [
+    `<b>${title}</b>`,
+    field("Timezone:", "BDT", "⏰"),
+    field("Generated:", new Date().toLocaleString("en-US", { timeZone: "Asia/Dhaka" }), "🕒"),
+    divider,
+    "<b>No valid top offers yet after filters.</b>",
+    "Survey, mail verification, and under-200 coin leads are excluded.",
+    divider,
+  ].join("\n");
+}
+
 function formatSearchResults(events, query) {
   const needle = String(query || "").trim().toLowerCase();
   if (!needle) return "Usage: /search offer-name";
@@ -481,8 +493,8 @@ async function sendAndPinTopReport(handlers, target = chatId, title = "📌 HOUR
     sources,
     title
   );
-  if (text.startsWith("No top offers")) return false;
-  const message = await sendTelegramMessage(text, target);
+  const messageText = text.startsWith("No top offers") ? formatEmptyTopReport(title) : text;
+  const message = await sendTelegramMessage(messageText, target);
   await pinTelegramMessage(message?.message_id, target);
   return true;
 }
@@ -598,7 +610,14 @@ async function answerCallbackQuery(id) {
  * }} handlers
  */
 export function startTelegramBot(handlers) {
-  if (!enabled() || !commandsEnabled || botStarted) return;
+  if (!enabled()) return;
+  startAutoTopPin(handlers);
+  startDailyTopPin(handlers);
+  if (!commandsEnabled) {
+    console.log("[telegram] bot commands disabled; top report pins enabled");
+    return;
+  }
+  if (botStarted) return;
   botStarted = true;
 
   const loop = async () => {
@@ -698,7 +717,5 @@ export function startTelegramBot(handlers) {
   };
 
   loop();
-  startAutoTopPin(handlers);
-  startDailyTopPin(handlers);
   console.log("[telegram] bot commands enabled");
 }
