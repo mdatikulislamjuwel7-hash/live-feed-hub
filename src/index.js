@@ -24,6 +24,7 @@ import {
   exportStoreState,
   hydrateStoreState,
   recordDailyImpressions,
+  removeEventsOutsideSources,
   upsertMany,
   PAGE_SIZE,
   HISTORY_PAGES,
@@ -186,6 +187,12 @@ async function boot() {
   const state = await readPersistedState();
   if (state?.events?.length) {
     hydrateStoreState(state);
+    const allowedSourceIds = new Set(getSources().map((source) => String(source.id)));
+    if (listCustomOffers().length) allowedSourceIds.add("custom");
+    const removed = removeEventsOutsideSources(allowedSourceIds);
+    if (removed > 0) {
+      console.log(`[persist] removed ${removed} cached rows for disabled sources`);
+    }
     console.log(`[persist] loaded ${state.events.length} cached events`);
   }
 

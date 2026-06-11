@@ -11,15 +11,6 @@
     "profileLimit": 12
   },
   {
-    "id": "cashinstyle",
-    "name": "CashInStyle",
-    "enabled": true,
-    "type": "ticker-api",
-    "url": "https://cashinstyle.com/api/activity-ticker.json",
-    "color": "#0ea5e9",
-    "pollSeconds": 25
-  },
-  {
     "id": "paidcash",
     "name": "PaidCash",
     "enabled": true,

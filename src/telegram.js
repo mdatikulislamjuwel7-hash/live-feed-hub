@@ -20,6 +20,8 @@ const topCoinsPinLimit = Math.min(
   40,
   Math.max(5, Number(process.env.TELEGRAM_TOPCOINS_PIN_LIMIT || 30))
 );
+const highCoinAmount = Number(process.env.TELEGRAM_HIGH_COIN_AMOUNT || 1000);
+const highUsdAmount = Number(process.env.TELEGRAM_HIGH_USD_AMOUNT || 10);
 
 let updateOffset = 0;
 let botStarted = false;
@@ -42,6 +44,21 @@ function amount(event) {
   return `${event.amount} ${event.unit || "points"}`;
 }
 
+function formatEventTime(event) {
+  const time = new Date(event?.at || 0).getTime();
+  if (!Number.isFinite(time) || time <= 0) return "unknown";
+  const seconds = Math.max(0, Math.round((Date.now() - time) / 1000));
+  const relative =
+    seconds < 60
+      ? `${seconds}s ago`
+      : seconds < 3600
+        ? `${Math.floor(seconds / 60)}m ago`
+        : seconds < 86400
+          ? `${Math.floor(seconds / 3600)}h ago`
+          : `${Math.floor(seconds / 86400)}d ago`;
+  return `${relative} (${new Date(time).toLocaleString("en-US", { timeZone: "UTC" })} UTC)`;
+}
+
 function isAllowedChat(id) {
   return !allowedChatIds.size || allowedChatIds.has(String(id));
 }
@@ -51,14 +68,24 @@ function shouldAlert(event) {
   return true;
 }
 
+function isHighValue(event) {
+  const value = Number(event.amount || 0);
+  const unit = String(event.unit || "").toUpperCase();
+  if (unit === "USD") return value >= highUsdAmount;
+  return value >= highCoinAmount;
+}
+
 function eventLine(event) {
   const name = event.offerName || event.offer || "Offer";
   const wall = event.offerwall || event.sourceName || "Source";
   const user = event.user ? `@${event.user}` : "unknown user";
   return [
-    `<b>${escapeHtml(event.sourceName)}</b>`,
-    `${escapeHtml(wall)} - ${escapeHtml(name)}`,
-    `${escapeHtml(user)} | ${escapeHtml(amount(event))}`,
+    `<b>Website:</b> ${escapeHtml(event.sourceName || event.source)}`,
+    `<b>Offer:</b> ${escapeHtml(name)}`,
+    `<b>Offerwall:</b> ${escapeHtml(wall)}`,
+    `<b>Reward:</b> ${escapeHtml(amount(event))}`,
+    `<b>User:</b> ${escapeHtml(user)}`,
+    `<b>Lead time:</b> ${escapeHtml(formatEventTime(event))}`,
   ].join("\n");
 }
 
@@ -110,7 +137,29 @@ export async function notifyTelegram(events) {
   const filtered = events.filter(shouldAlert);
   if (!filtered.length) return;
   for (const event of filtered) {
-    await sendTelegramMessage(`Live Feed Hub\n\n${eventLine(event)}`);
+    const title = isHighValue(event) ? "High Coin Alert" : "Live Feed Hub";
+    await sendTelegramMessage(`<b>${title}</b>\nNew live lead\n\n${eventLine(event)}`);
+  }
+}
+
+export async function notifySourceHealthChange(source, health, previousHealth) {
+  if (!enabled()) return;
+  const status = String(health?.status || "");
+  const previousStatus = String(previousHealth?.status || "");
+  if (!status || status === previousStatus) return;
+  if (status === "error") {
+    await sendTelegramMessage(
+      [
+        "<b>Source Error</b>",
+        "",
+        `<b>${escapeHtml(source?.name || source?.id || "Source")}</b> is failing.`,
+        escapeHtml(String(health?.lastError || "Unknown error")).slice(0, 700),
+      ].join("\n")
+    );
+  } else if (status === "ok" && previousStatus === "error") {
+    await sendTelegramMessage(
+      `<b>Source Recovered</b>\n\n<b>${escapeHtml(source?.name || source?.id || "Source")}</b> is working again.`
+    );
   }
 }
 
@@ -130,6 +179,7 @@ function helpText() {
     "/top - daily top offers",
     "/top apucash - top offers for one source",
     "/topcoins - highest coin offers today",
+    "/search binance - search feed history",
   ].join("\n");
 }
 
@@ -221,6 +271,30 @@ function formatTopCoins(data, sources = [], limit = 15) {
         `#${index + 1} <b>${escapeHtml(offer.sourceName)}</b>\n${escapeHtml(offer.offer)} — ${escapeHtml(offer.maxRawAmount || `${offer.maxAmount}`)}`
     ),
   ].join("\n");
+}
+
+function formatSearchResults(events, query) {
+  const needle = String(query || "").trim().toLowerCase();
+  if (!needle) return "Usage: /search offer-name";
+  const words = needle.split(/\s+/).filter(Boolean);
+  const rows = events
+    .filter((event) => {
+      const haystack = [
+        event.sourceName,
+        event.offerwall,
+        event.offerName,
+        event.offer,
+        event.user,
+        event.rawAmount,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return words.every((word) => haystack.includes(word));
+    })
+    .slice(0, 10);
+  if (!rows.length) return `No history found for: ${escapeHtml(query)}`;
+  return `<b>Search: ${escapeHtml(query)}</b>\n\n${rows.map(eventLine).join("\n\n")}`;
 }
 
 async function sendAndPinTopCoins(handlers, target = chatId) {
@@ -362,6 +436,11 @@ export function startTelegramBot(handlers) {
             );
           } else if (cmd === "/topcoins") {
             await sendTelegramMessage(formatTopCoins(handlers.getDailyTopOffers({ source: "all", limit: 8 }), sources), target);
+          } else if (cmd === "/search") {
+            await sendTelegramMessage(
+              formatSearchResults(handlers.getEvents({ source: "all", limit: 400 }), arg || ""),
+              target
+            );
           } else {
             await sendTelegramMessage(helpText(), target);
           }

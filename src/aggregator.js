@@ -3,7 +3,7 @@ import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { fetchSource } from "./adapters/index.js";
 import { writePersistedState } from "./persistence.js";
-import { notifyTelegram } from "./telegram.js";
+import { notifySourceHealthChange, notifyTelegram } from "./telegram.js";
 import {
   upsertMany,
   broadcastNew,
@@ -46,6 +46,7 @@ function schedulePersist() {
  */
 async function pollOne(source) {
   const id = /** @type {string} */ (source.id);
+  const previousHealth = sourceHealth[id];
   try {
     const events = await fetchSource(source);
     if (id === "paidcash") {
@@ -90,6 +91,9 @@ async function pollOne(source) {
       count: events.length,
       note,
     };
+    notifySourceHealthChange(source, sourceHealth[id], previousHealth).catch((err) => {
+      console.warn(`[telegram] ${err instanceof Error ? err.message : String(err)}`);
+    });
     console.log(`[${id}] ${events.length} items, ${added.length} new`);
     schedulePersist();
   } catch (err) {
@@ -100,6 +104,9 @@ async function pollOne(source) {
       lastError: message,
       count: 0,
     };
+    notifySourceHealthChange(source, sourceHealth[id], previousHealth).catch((err) => {
+      console.warn(`[telegram] ${err instanceof Error ? err.message : String(err)}`);
+    });
     console.warn(`[${id}] ${message}`);
   }
 }

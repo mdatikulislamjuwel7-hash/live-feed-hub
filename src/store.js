@@ -230,6 +230,24 @@ export function removePaidcashWithoutOfferName() {
 }
 
 /**
+ * Remove cached rows for sources that are no longer configured.
+ * @param {Set<string>} allowedSourceIds
+ * @returns {number}
+ */
+export function removeEventsOutsideSources(allowedSourceIds) {
+  if (!allowedSourceIds?.size) return 0;
+  const drop = new Set();
+  for (const ev of ordered) {
+    if (!allowedSourceIds.has(String(ev.source))) drop.add(ev.id);
+  }
+  if (!drop.size) return 0;
+  for (const id of drop) byId.delete(id);
+  ordered = ordered.filter((event) => !drop.has(event.id));
+  rebuildDailyFromOrdered();
+  return drop.size;
+}
+
+/**
  * @param {{ source?: string, limit?: number }} [opts]
  */
 export function getEvents(opts = {}) {
@@ -295,6 +313,16 @@ function resetDailyIfNeeded() {
   if (impressionDay === day) return;
   impressionDay = day;
   dailyOfferCounts.clear();
+}
+
+function rebuildDailyFromOrdered() {
+  resetDailyIfNeeded();
+  dailyOfferCounts.clear();
+  for (const event of ordered) {
+    if (String(event.at || "").slice(0, 10) === impressionDay) {
+      recordDailyImpressions(event.source, [event]);
+    }
+  }
 }
 
 /**
