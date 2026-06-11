@@ -33,6 +33,14 @@ const highUsdAmount = Number(process.env.TELEGRAM_HIGH_USD_AMOUNT || 10);
 const divider = "━━━━━━━━━━━━━━━━";
 const alertSendDelayMs = Math.max(500, Number(process.env.TELEGRAM_ALERT_DELAY_MS || 1500));
 const alertDedupeMs = Math.max(1, Number(process.env.TELEGRAM_ALERT_DEDUPE_HOURS || 24)) * 60 * 60 * 1000;
+const minCoinAlertAmount = Math.max(0, Number(process.env.TELEGRAM_MIN_COIN_AMOUNT || 200));
+const blockedOfferPatterns = String(
+  process.env.TELEGRAM_BLOCK_OFFER_PATTERNS ||
+    "survey,mail verify,mail verification,email verify,email verification"
+)
+  .split(",")
+  .map((pattern) => pattern.trim().toLowerCase())
+  .filter(Boolean);
 
 let updateOffset = 0;
 let botStarted = false;
@@ -85,9 +93,34 @@ function isAllowedChat(id) {
   return !allowedChatIds.size || allowedChatIds.has(String(id));
 }
 
+function hasBlockedOfferText(value) {
+  const text = String(value || "").toLowerCase();
+  return Boolean(text && blockedOfferPatterns.some((pattern) => text.includes(pattern)));
+}
+
+function isCoinLikeUnit(unit) {
+  const value = String(unit || "").toUpperCase();
+  return value !== "USD";
+}
+
+function passesTelegramContentFilter(event) {
+  const searchable = [event.offerName, event.offer, event.offerwall].filter(Boolean).join(" ");
+  if (hasBlockedOfferText(searchable)) return false;
+  if (isCoinLikeUnit(event.unit) && Number(event.amount || 0) < minCoinAlertAmount) return false;
+  return true;
+}
+
+function passesTelegramOfferFilter(offer) {
+  if (hasBlockedOfferText(offer?.offer)) return false;
+  const raw = String(offer?.maxRawAmount || "");
+  const isUsd = raw.includes("$") || String(offer?.unit || "").toUpperCase() === "USD";
+  if (!isUsd && Number(offer?.maxAmount || 0) < minCoinAlertAmount) return false;
+  return true;
+}
+
 function shouldAlert(event) {
   if (sourceFilter.size && !sourceFilter.has(String(event.source))) return false;
-  return true;
+  return passesTelegramContentFilter(event);
 }
 
 function pruneSentAlertIds() {
@@ -260,8 +293,9 @@ function helpText() {
 }
 
 function formatFeed(events, title = "Latest Feed") {
-  if (!events.length) return "No feed rows yet.";
-  return `<b>🚀 ${escapeHtml(title.toUpperCase())}</b>\n${events.slice(0, 10).map(eventLine).join("\n")}`;
+  const filtered = events.filter(passesTelegramContentFilter);
+  if (!filtered.length) return "No feed rows matched Telegram filters yet.";
+  return `<b>🚀 ${escapeHtml(title.toUpperCase())}</b>\n${filtered.slice(0, 10).map(eventLine).join("\n")}`;
 }
 
 function formatSources(sources) {
@@ -318,6 +352,7 @@ function formatTopOffers(data, sources = []) {
     .slice(0, 8)
     .map(([sourceId, block]) => {
       const rows = (block.byCoins || block.byFrequency || [])
+        .filter(passesTelegramOfferFilter)
         .slice(0, 5)
         .map((offer) => `#${offer.rank} ${escapeHtml(offer.offer)} — ${escapeHtml(offer.maxRawAmount || `${offer.maxAmount}`)}`)
         .join("\n");
@@ -337,6 +372,7 @@ function formatTopCoins(data, sources = [], limit = 15) {
         sourceName: names.get(sourceId) || sourceId,
       }))
     )
+    .filter(passesTelegramOfferFilter)
     .sort((a, b) => Number(b.maxAmount || 0) - Number(a.maxAmount || 0) || Number(b.count || 0) - Number(a.count || 0))
     .slice(0, limit);
 
@@ -358,19 +394,23 @@ function formatAutoTopReport(data, sources = []) {
   const sourceRows = Object.entries(data.bySource || {});
   const byFrequency = sourceRows
     .flatMap(([sourceId, block]) =>
-      (block.byFrequency || []).map((offer) => ({
-        ...offer,
-        sourceName: names.get(sourceId) || sourceId,
-      }))
+      (block.byFrequency || [])
+        .filter(passesTelegramOfferFilter)
+        .map((offer) => ({
+          ...offer,
+          sourceName: names.get(sourceId) || sourceId,
+        }))
     )
     .sort((a, b) => Number(b.count || 0) - Number(a.count || 0) || Number(b.maxAmount || 0) - Number(a.maxAmount || 0))
     .slice(0, 10);
   const byCoins = sourceRows
     .flatMap(([sourceId, block]) =>
-      (block.byCoins || []).map((offer) => ({
-        ...offer,
-        sourceName: names.get(sourceId) || sourceId,
-      }))
+      (block.byCoins || [])
+        .filter(passesTelegramOfferFilter)
+        .map((offer) => ({
+          ...offer,
+          sourceName: names.get(sourceId) || sourceId,
+        }))
     )
     .sort((a, b) => Number(b.maxAmount || 0) - Number(a.maxAmount || 0) || Number(b.count || 0) - Number(a.count || 0))
     .slice(0, 10);
@@ -414,6 +454,7 @@ function formatSearchResults(events, query) {
   const words = needle.split(/\s+/).filter(Boolean);
   const rows = events
     .filter((event) => {
+      if (!passesTelegramContentFilter(event)) return false;
       const haystack = [
         event.sourceName,
         event.offerwall,
