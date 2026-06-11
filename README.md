@@ -1,146 +1,132 @@
 # Live Feed Hub
 
-Reward activity dashboard for public/live earning feeds. It runs locally with an Express server and can also be deployed to Netlify or Vercel using serverless functions.
+এক ওয়েবসাইটে অনেক রিওয়ার্ড সাইটের **লাইভ earn টিকার** একসাথে দেখুন।
 
-## Local Run
+## চালানো
 
 ```bash
+cd "c:\Users\MD Atikul Islam\Documents\busnees"
 npm install
 npm start
 ```
 
-Open:
+ব্রাউজার: **http://localhost:3847**
+
+Admin panel: **http://localhost:3847/admin.html**
+
+## History / persistence
+
+- প্রতি source/site সর্বোচ্চ **400 history rows** রাখা হয়।
+- History `.data/live-feed-state.json` ফাইলে save হয়, তাই restart-এর পরও data থাকে।
+- Source/API যদি actual completion timestamp দেয়, app সেটাই দেখায়।
+- Source timestamp না দিলে app first-seen time save করে, কারণ public feed থেকে real completion time পাওয়া যায় না।
+
+## Custom offers + postback
+
+`/admin.html` থেকে custom offer add/update/delete করা যায়।
+
+প্রতি custom offer-এর জন্য admin panel থেকে:
+
+- Click URL copy করা যায়
+- Postback URL copy করা যায়
+- Postback hit হলে `Custom Offers` source হিসেবে History + Daily Top Offers-এ conversion যোগ হয়
+
+Example postback:
 
 ```text
-http://127.0.0.1:3847/
+http://localhost:3847/api/postback/custom?offer_id=OFFER_ID&click_id={click_id}&user_id={user_id}&amount={amount}&txid={txid}&secret=SECRET
 ```
 
-## Persistence
+## Free 24/7 server
 
-Local server data is saved in:
+True 24/7 background polling-এর জন্য free serverless না, **Oracle Cloud Always Free VPS** ব্যবহার করুন।
+
+Deploy guide: [`DEPLOY_ORACLE_FREE.md`](./DEPLOY_ORACLE_FREE.md)
+
+Railway deploy guide: [`DEPLOY_RAILWAY.md`](./DEPLOY_RAILWAY.md)
+
+Railway-তে history persist রাখতে Volume mount করে `DATA_DIR=/data` set করুন।
+
+## Telegram bot
+
+Environment variables:
+
+```env
+TELEGRAM_BOT_TOKEN=YOUR_NEW_TOKEN
+TELEGRAM_CHAT_ID=YOUR_CHAT_ID
+TELEGRAM_ALLOWED_CHAT_IDS=YOUR_CHAT_ID
+TELEGRAM_MIN_AMOUNT=40
+```
+
+Commands:
 
 ```text
-.data/live-feed-state.json
+/status
+/sources
+/feed
+/feed apucash
+/top
+/top apucash
 ```
 
-That file is ignored by git. Restarting the local server now loads old stored events before polling again.
+## এখন যেসব সাইট যুক্ত
 
-On Netlify, the same state is saved to Netlify Blobs from inside the serverless function. Netlify Blobs is meant for unstructured function data and supports `getStore`, `get`, and `setJSON`; updates can take up to about 60 seconds to propagate globally.
+| সাইট | পদ্ধতি |
+|------|--------|
+| **ApuCash** | Headless browser (Livewire poll ~18s) + HTML fallback |
+| **CashInStyle** | পাবলিক API `activity-ticker.json` |
+| **PaidCash** | Socket.io (`servers.faucetify.io`) — offer name + country when public |
+| **Gamers Universe** | [live.html](https://gamersunivers.com/page/live.html) — Live Completions (cookie) অথবা পাবলিক payouts |
 
-## Telegram Bot Alerts
+### Gamers Universe — Live Completions (Offery, offer নাম)
 
-The local server can send new live rows to a Telegram chat.
+স্ক্রিনশটের মতো **Tillamook / LifePoints** দেখতে লগইন কুকি দরকার:
 
-1. Open Telegram and message `@BotFather`.
-2. Create a bot with `/newbot`.
-3. Copy the bot token.
-4. Send any message to your bot.
-5. Get your chat id by opening this URL in a browser:
+1. ব্রাউজারে [login](https://gamersunivers.com/page/login.html) করুন  
+2. [live.html](https://gamersunivers.com/page/live.html) খুলুন (Live Completions)  
+3. DevTools → Application → Cookies → `PHPSESSID` ইত্যাদি কপি করুন  
+4. `config/gamersuniverse.cookie.example` কপি করে `config/gamersuniverse.cookie` এ পেস্ট করুন  
+5. `npm start` রিস্টার্ট করুন  
 
-```text
-https://api.telegram.org/botYOUR_TOKEN/getUpdates
+কুকি ছাড়া শুধু পাবলিক **Recent Payouts** (৫টি) দেখাবে — Offery offer completions নয়।
+
+## নতুন সাইট যোগ করা
+
+`config/sources.json` এ এন্ট্রি যোগ করুন:
+
+**JSON API** (যদি `https://example.com/api/activity-ticker.json` কাজ করে):
+
+```json
+{
+  "id": "mysite",
+  "name": "My Site",
+  "enabled": true,
+  "type": "ticker-api",
+  "url": "https://example.com/api/activity-ticker.json",
+  "color": "#f59e0b",
+  "pollSeconds": 25
+}
 ```
 
-6. Start the server with environment variables:
+**ApuCash-এর মতো HTML ticker**:
 
-PowerShell:
-
-```powershell
-$env:TELEGRAM_BOT_TOKEN="YOUR_TOKEN"
-$env:TELEGRAM_CHAT_ID="YOUR_CHAT_ID"
-$env:TELEGRAM_BATCH_LIMIT="5"
-npm start
+```json
+{
+  "id": "othersite",
+  "name": "Other Site",
+  "enabled": true,
+  "type": "html-livewire",
+  "url": "https://othersite.com",
+  "color": "#ec4899",
+  "pollSeconds": 20
+}
 ```
 
-If those variables are not set, the app runs normally without Telegram messages.
+সার্ভার রিস্টার্ট করুন।
 
-## Netlify Deploy
+## নোট
 
-This repo includes:
-
-```text
-netlify.toml
-netlify/functions/api.js
-```
-
-Deploy steps:
-
-1. Push this folder to a GitHub repository.
-2. In Netlify, create a new site from that repository.
-3. Use the default settings from `netlify.toml`.
-4. Add optional environment variables:
-   - `REVNO_COOKIE` for Revno authenticated dashboard data.
-   - `SPLITDROP_COOKIE` for Splitdrop logged-in recent earners.
-   - `REFRESH_MIN_SECONDS` to control minimum refresh interval. Default is `45`.
-5. Deploy.
-
-Netlify routes:
-
-```text
-/api/feed
-/api/sources
-/api/top-offers
-/api/stream
-```
-
-The Netlify version fetches and stores data when visitors hit the API. It skips browser-only adapters such as ApuCash browser rendering and PaidCash browser fallback so the free function stays lightweight.
-
-## Vercel Deploy
-
-This repo also includes:
-
-```text
-vercel.json
-api/index.js
-```
-
-Deploy steps:
-
-1. Push this folder to GitHub.
-2. In Vercel, import the GitHub repository.
-3. Framework preset: `Other`.
-4. Build command: leave empty or use Vercel default.
-5. Output directory: `public`.
-6. Add optional environment variables:
-   - `BLOB_READ_WRITE_TOKEN` if using Vercel Blob persistence.
-   - `LIVE_FEED_STATE_BLOB_URL` after the first blob save, so future cold starts can read the same JSON file.
-   - `REVNO_COOKIE` for Revno authenticated dashboard data.
-   - `SPLITDROP_COOKIE` for Splitdrop logged-in recent earners.
-   - `REFRESH_MIN_SECONDS` to control minimum refresh interval. Default is `45`.
-7. Deploy.
-
-Vercel routes:
-
-```text
-/api/feed
-/api/sources
-/api/top-offers
-/api/stream
-```
-
-The Vercel version works like the Netlify version: it refreshes data when visitors hit the API and stores history in Vercel Blob when `BLOB_READ_WRITE_TOKEN` is configured. It skips browser-only adapters so the free function remains deployable.
-
-## Current Sources
-
-- ApuCash: local browser/Livewire adapter.
-- CashInStyle: public ticker API.
-- PaidCash: local socket/browser adapter.
-- Gamers Universe: public/live page, payout rows disabled.
-- GoldTasker: public API.
-- CashlyEarn Public: public homepage cards.
-- LootyCash: public API.
-- EarnLab: public API.
-- LootGain: public GraphQL.
-- ZxEarn: public homepage parser.
-- EarnGift: public `Live.php` table.
-- HuntSkin: public `Liveoffersfinal/Live.php` table.
-- PaidByte: public live leads API.
-- TrevBucks: public Livewire cashout ticker.
-- Splitdrop: logged-in recent earners when a valid cookie is available; otherwise public featured offers page.
-- Revno: authenticated dashboard parser when cookie is valid.
-
-## Notes
-
-- Use only public endpoints or cookies/sessions from accounts you own or are allowed to use.
-- Do not commit cookie files. `.gitignore` excludes local cookies and `.data`.
-- Netlify free functions are not long-running servers, so live updates happen by request refresh rather than permanent background polling.
+- তৃতীয় পক্ষের পাবলিক ডেটা; তালিকাভুক্ত সাইটের সাথে অফিসিয়াল সংযুক্তি নেই।
+- কিছু সাইট API দেয় না — শুধু HTML scrape (`html-livewire`)।
+- ApuCash **Puppeteer** দিয়ে বারবার চেক করে (~৪৫ সেকেন্ডে একবার, প্রতি বার ~২০ সেকেন্ড লাগে)।
+- Monlix/Adsprem-এর **গেমের নাম** ApuCash পাবলিক ফিডে দেয় না — শুধু offerwall + coin; Daily Tasks-এ task নাম ম্যাপ করা হয়।

@@ -7,7 +7,8 @@
     "url": "https://apucash.com",
     "color": "#7c3aed",
     "pollSeconds": 90,
-    "useBrowser": false
+    "useBrowser": false,
+    "profileLimit": 12
   },
   {
     "id": "cashinstyle",
@@ -29,16 +30,6 @@
     "blockOfferPatterns": ["MM Quiz", "Watch More"]
   },
   {
-    "id": "gamersuniverse",
-    "name": "Gamers Universe",
-    "enabled": true,
-    "type": "gamersuniverse-html",
-    "url": "https://gamersunivers.com/page/live.html",
-    "color": "#00b4ff",
-    "pollSeconds": 60,
-    "includePayouts": false
-  },
-  {
     "id": "goldtasker",
     "name": "GoldTasker",
     "enabled": true,
@@ -47,15 +38,6 @@
     "url": "https://goldtasker.com/api/live-offers",
     "color": "#f59e0b",
     "pollSeconds": 35
-  },
-  {
-    "id": "cashlyearn",
-    "name": "CashlyEarn Public",
-    "enabled": true,
-    "type": "cashlyearn-public",
-    "url": "https://cashlyearn.com/",
-    "color": "#14f195",
-    "pollSeconds": 120
   },
   {
     "id": "lootycash",
@@ -139,6 +121,7 @@
     "enabled": true,
     "type": "trevbucks-livewire",
     "url": "https://trevbucks.com/",
+    "laravelMode": "live-cashouts",
     "color": "#facc15",
     "pollSeconds": 90,
     "limit": 30
@@ -167,16 +150,47 @@
     "limit": 40
   },
   {
-    "id": "revno",
-    "name": "Revno",
+    "id": "boostlyearn",
+    "name": "BoostlyEarn",
     "enabled": true,
-    "type": "revno-dashboard",
-    "url": "https://revno.net/earn/",
-    "historyUrl": "https://revno.net/earn/history.php",
-    "cookieFile": "config/revno.cookie",
-    "color": "#f97316",
-    "pollSeconds": 120,
-    "withdrawLimit": 40,
-    "userLabel": "Revno account"
+    "type": "laravel-live-feed",
+    "url": "https://boostlyearn.com/",
+    "laravelMode": "live-cashouts",
+    "color": "#a855f7",
+    "pollSeconds": 60,
+    "limit": 30
+  },
+  {
+    "id": "rubcashly",
+    "name": "Rubcashly",
+    "enabled": true,
+    "type": "ticker-cards-html",
+    "url": "https://rubcashly.com/",
+    "tickerSelector": "#ticker-completed",
+    "color": "#f43f5e",
+    "pollSeconds": 75,
+    "limit": 40
+  },
+  {
+    "id": "earnlycash",
+    "name": "EarnlyCash",
+    "enabled": true,
+    "type": "swiper-csm-feed",
+    "url": "https://earnlycash.com/",
+    "feedType": "offer",
+    "color": "#0d9488",
+    "pollSeconds": 60,
+    "limit": 50
+  },
+  {
+    "id": "earng",
+    "name": "EarnG",
+    "enabled": true,
+    "type": "laravel-live-feed",
+    "url": "https://earng.net/earn",
+    "laravelMode": "live-leads",
+    "color": "#6366f1",
+    "pollSeconds": 75,
+    "limit": 30
   }
 ]

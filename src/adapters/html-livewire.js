@@ -3,7 +3,12 @@ import { parseApucashHtml } from "./parse-apucash-html.js";
 import {
   loadApucashCookie,
   fetchApucashViaLivewire,
+  fetchApucashProfilesViaLivewire,
 } from "./apucash-livewire.js";
+
+function extractUserIds(html) {
+  return [...String(html || "").matchAll(/userId':\s*'(\d+)'/g)].map((match) => match[1]);
+}
 
 /**
  * ApuCash: cookie Livewire → headless browser → fast HTML.
@@ -19,8 +24,18 @@ export async function fetchHtmlLivewire(source) {
     try {
       const lwHtml = await fetchApucashViaLivewire(cookie);
       if (lwHtml) {
-        const events = await parseApucashHtml(lwHtml, source);
-        console.log(`[apucash] livewire session: ${events.length} items`);
+        const profiles = await fetchApucashProfilesViaLivewire(
+          cookie,
+          extractUserIds(lwHtml),
+          Number(source.profileLimit) || 12
+        );
+        const events = await parseApucashHtml(lwHtml, source, profiles);
+        const named = events.filter(
+          (e) => e.offerName && !String(e.offerName).includes("coin reward")
+        );
+        console.log(
+          `[apucash] livewire session: ${events.length} items, ${named.length} named`
+        );
         return events;
       }
     } catch (err) {

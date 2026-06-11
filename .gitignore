@@ -1,8 +1,5 @@
 node_modules/
-.data/
 .env
-config/apucash.cookie
-config/gamersuniverse.cookie
-config/revno.cookie
-config/splitdrop.cookie
+config/*.cookie
+.data/
 *.log

@@ -102,8 +102,14 @@ function normalizeLootycash(row, source) {
 function normalizeEarnlab(row, source) {
   const user = /** @type {Record<string, unknown>} */ (row.user ?? {});
   const username = String(user.username || "Anonymous");
-  const offerwall = String(row.subTitle || row.type || "Offer");
-  const offerName = String(row.title || "Offer");
+  const type = String(row.type || "");
+  const offerwall = String(row.subTitle || type || "Offer");
+  const offerName = String(
+    row.title ||
+      (type === "WITHDRAWAL" && row.subTitle ? `${row.subTitle} withdrawal` : "") ||
+      type.replace(/_/g, " ").toLowerCase() ||
+      "Offer"
+  );
   const reward = asNumber(row.amount);
   const at = String(row.createdAt || row.date || new Date().toISOString());
   const id = String(row.id || hashId(String(source.id), [username, offerwall, offerName, reward]));

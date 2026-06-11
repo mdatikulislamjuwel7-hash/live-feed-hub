@@ -25,28 +25,6 @@ const FLAG_TO_COUNTRY = {
 const LIVE_FEED_LIMIT = 50;
 
 /**
- * @param {Record<string, unknown>} source
- */
-function shouldIncludePayouts(source) {
-  return source.includePayouts !== false;
-}
-
-/**
- * @param {ReturnType<typeof parseCompletionBlock>[]} rows
- * @param {Record<string, unknown>} source
- */
-function filterPayoutRows(rows, source) {
-  if (shouldIncludePayouts(source)) return rows;
-  return rows.filter(
-    (row) =>
-      row &&
-      row.offerwall !== "Payout" &&
-      row.offerwall !== "Cash Out" &&
-      row.offerName !== "Withdrawal"
-  );
-}
-
-/**
  * @param {string} flagSrc
  * @param {string} flagAlt
  */
@@ -176,7 +154,7 @@ function parsePayoutItem($, $item) {
  */
 function buildCompletionEvents(rows, source) {
   const now = new Date().toISOString();
-  return filterPayoutRows(rows, source).slice(0, 40).map((row) => {
+  return rows.slice(0, 40).map((row) => {
     const offer = `${row.offerwall} → ${row.offerName}`;
     const id = crypto
       .createHash("sha256")
@@ -357,8 +335,6 @@ async function fetchLiveViaBrowser(cookie, url) {
  * @param {Record<string, unknown>} source
  */
 async function fetchPublicPayouts(source) {
-  if (!shouldIncludePayouts(source)) return [];
-
   const url = String(source.url || "https://gamersunivers.com/page/live.html");
   const res = await fetch(url, {
     headers: {

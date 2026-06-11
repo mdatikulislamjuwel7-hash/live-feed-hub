@@ -11,8 +11,6 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@netlify/blobs": "^10.7.9",
-    "@vercel/blob": "^2.4.0",
     "cheerio": "^1.0.0",
     "express": "^4.21.2",
     "puppeteer": "^25.1.0",

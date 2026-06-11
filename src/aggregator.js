@@ -2,18 +2,17 @@ import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { fetchSource } from "./adapters/index.js";
+import { writePersistedState } from "./persistence.js";
+import { notifyTelegram } from "./telegram.js";
 import {
   upsertMany,
   broadcastNew,
   getStats,
+  exportStoreState,
   recordDailyImpressions,
   removePaidcashWithoutOfferName,
   removePaidcashBlockedOffers,
-  exportStoreState,
-  hydrateStoreState,
 } from "./store.js";
-import { readPersistedState, writePersistedState } from "./persistence.js";
-import { notifyTelegram, telegramStatus } from "./telegram.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const configPath = join(__dirname, "..", "config", "sources.json");
@@ -26,29 +25,20 @@ export const sourceHealth = {};
 
 /** @type {Map<string, NodeJS.Timeout>} */
 const timers = new Map();
-const inFlight = new Set();
 
+/** @type {ReturnType<typeof setTimeout> | null} */
 let persistTimer = null;
-
-export async function loadPersistedStore() {
-  const state = await readPersistedState();
-  if (state) {
-    hydrateStoreState(state);
-    console.log(`[persistence] loaded ${getStats().total} stored events`);
-  }
-}
-
-export async function savePersistedStore() {
-  await writePersistedState(exportStoreState());
-}
 
 function schedulePersist() {
   if (persistTimer) clearTimeout(persistTimer);
   persistTimer = setTimeout(() => {
-    savePersistedStore().catch((err) =>
-      console.warn(`[persistence] save failed: ${err instanceof Error ? err.message : String(err)}`)
-    );
-  }, 900);
+    persistTimer = null;
+    writePersistedState(exportStoreState()).catch((err) => {
+      console.warn(
+        `[persist] save failed: ${err instanceof Error ? err.message : String(err)}`
+      );
+    });
+  }, 1500);
 }
 
 /**
@@ -56,12 +46,6 @@ function schedulePersist() {
  */
 async function pollOne(source) {
   const id = /** @type {string} */ (source.id);
-  if (inFlight.has(id)) {
-    console.log(`[${id}] skipped: previous poll still running`);
-    return;
-  }
-  inFlight.add(id);
-  const started = Date.now();
   try {
     const events = await fetchSource(source);
     if (id === "paidcash") {
@@ -80,14 +64,13 @@ async function pollOne(source) {
       }
     }
     const added = upsertMany(events);
-    recordDailyImpressions(id, events);
-    if (added.length > 0) broadcastNew(added);
     if (added.length > 0) {
-      notifyTelegram(added).catch((err) =>
-        console.warn(`[telegram] ${err instanceof Error ? err.message : String(err)}`)
-      );
+      recordDailyImpressions(id, added);
+      broadcastNew(added);
+      notifyTelegram(added).catch((err) => {
+        console.warn(`[telegram] ${err instanceof Error ? err.message : String(err)}`);
+      });
     }
-    if (added.length > 0 || events.length > 0) schedulePersist();
     /** @type {string | null} */
     let note = null;
     if (
@@ -98,24 +81,17 @@ async function pollOne(source) {
       )
     ) {
       note =
-        "Only public payouts are visible. Add a fresh config/gamersuniverse.cookie for Live Completions.";
-    } else if (
-      id === "gamersuniverse" &&
-      events.length === 0 &&
-      source.includePayouts === false
-    ) {
-      note = "No completion rows right now; payout rows are hidden by config.";
+        "শুধু পাবলিক payouts — Live Completions (Offery) এর জন্য config/gamersuniverse.cookie";
     }
     sourceHealth[id] = {
       status: "ok",
       lastOk: new Date().toISOString(),
       lastError: null,
       count: events.length,
-      added: added.length,
-      latencyMs: Date.now() - started,
       note,
     };
-    console.log(`[${id}] ${events.length} items, ${added.length} new, ${Date.now() - started}ms`);
+    console.log(`[${id}] ${events.length} items, ${added.length} new`);
+    schedulePersist();
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     sourceHealth[id] = {
@@ -123,12 +99,8 @@ async function pollOne(source) {
       lastOk: sourceHealth[id]?.lastOk ?? null,
       lastError: message,
       count: 0,
-      added: 0,
-      latencyMs: Date.now() - started,
     };
     console.warn(`[${id}] ${message}`);
-  } finally {
-    inFlight.delete(id);
   }
 }
 
@@ -137,29 +109,35 @@ export async function runInitialFetch() {
   await Promise.allSettled(enabled.map((s) => pollOne(s)));
 }
 
-export async function refreshAllSources() {
-  const enabled = sources
-    .filter((s) => s.enabled)
-    .sort((a, b) => sourcePollRank(a) - sourcePollRank(b));
-  await Promise.allSettled(enabled.map((s) => pollOne(s)));
-  return getStats();
-}
-
 function sourcePollRank(source) {
   const type = String(source.type || "");
-  if (type === "ticker-api") return 0;
-  if (type === "gamersuniverse-html") return 1;
-  if (type === "paidcash-browser") return 2;
+  if (
+    type === "ticker-api" ||
+    type === "json-feed" ||
+    type === "graphql-feed" ||
+    type === "paidbyte-public" ||
+    type === "earnfino-leaderboard"
+  ) {
+    return 0;
+  }
+  if (
+    type === "gamersuniverse-html" ||
+    type === "laravel-live-feed" ||
+    type === "zxearn-html" ||
+    type === "cashlyearn-public" ||
+    type === "live-table" ||
+    type === "swiper-csm-feed" ||
+    type === "ticker-cards-html"
+  ) {
+    return 1;
+  }
+  if (type === "paidcash-browser" || type === "trevbucks-livewire") return 2;
+  if (type === "splitdrop-public" || type === "revno-dashboard") return 3;
+  if (type === "html-livewire") return 4;
   return 3;
 }
 
-function isFastStartupSource(source) {
-  const type = String(source.type || "");
-  return type !== "html-livewire" && type !== "paidcash-browser";
-}
-
 export function startPolling() {
-  console.log(`[telegram] ${telegramStatus()}`);
   const enabled = sources
     .filter((s) => s.enabled)
     .sort((a, b) => sourcePollRank(a) - sourcePollRank(b));
@@ -169,9 +147,6 @@ export function startPolling() {
     const seconds = Number(source.pollSeconds) || 20;
 
     pollOne(source);
-    if (isFastStartupSource(source)) {
-      setTimeout(() => pollOne(source), 7000);
-    }
     if (timers.has(id)) clearInterval(timers.get(id));
     timers.set(
       id,
@@ -181,20 +156,39 @@ export function startPolling() {
 }
 
 export function getSources() {
-  return sources.map((s) => ({
-    id: s.id,
-    name: s.name,
-    enabled: s.enabled,
-    color: s.color,
-    type: s.type,
-    health: sourceHealth[/** @type {string} */ (s.id)] ?? {
-      status: "pending",
-      lastOk: null,
-      lastError: null,
-      count: 0,
-      note: null,
-    },
-  }));
+  const cached = getStats().sources;
+  return sources.map((s) => {
+    const id = /** @type {string} */ (s.id);
+    const live = sourceHealth[id];
+    const stored = cached[id] || 0;
+    if (live) {
+      return {
+        id: s.id,
+        name: s.name,
+        enabled: s.enabled,
+        color: s.color,
+        type: s.type,
+        health: {
+          ...live,
+          count: live.status === "ok" ? live.count : Math.max(live.count, stored),
+        },
+      };
+    }
+    return {
+      id: s.id,
+      name: s.name,
+      enabled: s.enabled,
+      color: s.color,
+      type: s.type,
+      health: {
+        status: stored > 0 ? "ok" : "syncing",
+        lastOk: null,
+        lastError: null,
+        count: stored,
+        note: stored > 0 ? "Refreshing…" : null,
+      },
+    };
+  });
 }
 
 export function reloadConfig() {

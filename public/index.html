@@ -3,29 +3,30 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Live Feed Hub - Reward Activity Console</title>
+  <title>Live Feed Hub — All reward sites in one place</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/styles.css?v=6" />
+  <link rel="stylesheet" href="/styles.css?v=7" />
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
-      <span class="brand-icon" aria-hidden="true">LH</span>
+      <span class="brand-icon" aria-hidden="true">⚡</span>
       <div>
         <h1>Live Feed Hub</h1>
-        <p class="tagline">Reward activity console for live sources, top offers, and history</p>
+        <p class="tagline">সব রিওয়ার্ড সাইটের লাইভ earn — এক জায়গায়</p>
       </div>
     </div>
     <div class="topbar-meta">
+      <a class="admin-link" href="/admin.html">Admin</a>
       <span id="statusDot" class="status-dot" title="Connection"></span>
-      <span id="statusText" class="status-text">Connecting...</span>
+      <span id="statusText" class="status-text">Connecting…</span>
     </div>
   </header>
 
   <section class="ticker-section" aria-label="Live activity ticker">
-    <div class="ticker-label">Now</div>
+    <div class="ticker-label">Live</div>
     <div class="ticker-track" id="tickerTrack">
       <div class="ticker-inner" id="tickerInner"></div>
     </div>
@@ -33,47 +34,22 @@
 
   <main class="layout">
     <aside class="sidebar">
-      <div class="panel-title">
-        <h2>Sources</h2>
-        <span id="sourceTotal">0</span>
-      </div>
+      <h2>Sources</h2>
       <div id="sourceFilters" class="source-filters"></div>
       <div id="sourceHealth" class="source-health"></div>
     </aside>
 
     <section class="feed-panel">
-      <section class="summary-grid" aria-label="Feed summary">
-        <article class="summary-card">
-          <span class="summary-label">Events</span>
-          <strong id="summaryEvents">0</strong>
-        </article>
-        <article class="summary-card">
-          <span class="summary-label">Online</span>
-          <strong id="summaryOnline">0</strong>
-        </article>
-        <article class="summary-card">
-          <span class="summary-label">View</span>
-          <strong id="summaryView">All</strong>
-        </article>
-        <article class="summary-card">
-          <span class="summary-label">Last Seen</span>
-          <strong id="summaryLast">Waiting</strong>
-        </article>
-      </section>
-
       <section class="top-offers-section" aria-label="Daily top offers">
         <div class="section-head">
-          <h2>Top Offers</h2>
-          <span class="section-hint">Most repeated offers seen today, grouped by site.</span>
+          <h2>Daily top offers</h2>
+          <span class="section-hint">প্রতি সাইট — বেশি coin এবং বেশি বার যা live ফিডে এসেছে</span>
         </div>
         <div id="topOffersGrid" class="top-offers-grid"></div>
       </section>
 
       <div class="feed-header">
-        <div>
-          <h2>Activity History</h2>
-          <p>Latest completions, visible rewards, partner boosts, and public payout signals.</p>
-        </div>
+        <h2>History</h2>
         <span id="feedCount" class="feed-count">0 events</span>
       </div>
       <ul id="feedList" class="feed-list"></ul>
@@ -85,6 +61,6 @@
     <p>Third-party public activity feeds. Not affiliated with listed sites. Data refreshes automatically.</p>
   </footer>
 
-  <script src="/app.js?v=6" type="module"></script>
+  <script src="/app.js?v=7" type="module"></script>
 </body>
 </html>

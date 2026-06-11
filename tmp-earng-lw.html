@@ -1,0 +1,171 @@
+<div wire:id="v9yETFNBWiky4b4t9uTy">
+
+
+  <div class="live-cashout container-fluid navbar-expand-xl navbar-detached " style="border-radius: 6px;">
+    <div class="d-flex justify-content-start mt-2 small ">
+      <div class="card text-white me-2 py-2 px-3" style="min-width: 45px !important;">
+        <div class="card-body p-0 pb-0 text-center" style="padding: 0 !important; ">
+          <div class="d-flex justify-content-center gap-2">
+            <div class="align-items-center ">
+
+              <i class="fa-solid p-2 mt-0 fi fi-bd circle"
+                 style="font-size: larger" data-bs-toggle="tooltip" data-bs-placement="bottom"
+                 data-bs-original-title="Bangladesh"></i>
+
+
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      <div class="swiper" style="max-height: 50px !important; "
+           x-init="if($refs.swiperLiveLead) {
+                 window.swiper($refs.swiperLiveLead, {
+                     slidesPerView: 'auto' ,
+                     allowTouchMove: true,
+                     autoplay: { delay: 2000, disableOnInteraction: false }
+                 });
+
+             }" x-ref="swiperLiveLead" wire:ignore>
+
+
+        <div class="swiper-wrapper" style="transform: translate3d(0px, 0px, 0px);"
+             x-data="(() => {
+         const dollarRatio = 1000;
+
+         return {
+             refreshTimer: null,
+             leads: $wire.entangle('liveLeads').live,
+             coinIcon: 'https://earng.net/assets/img/coin.png',
+             dollarRatio,
+             coinName: 'points',
+             newLeadIds: $wire.entangle('newLeadIds').defer,
+             is_dollar: JSON.parse(localStorage.getItem('is_dollar')) ?? false,
+
+             isNewLead(id) {
+                 return this.newLeadIds.includes(id);
+             },
+
+             splittedDollar(points) {
+                 // Example: 1000 points = $1.00. Adjust logic if your ratio differs
+                 let raw = (points / dollarRatio).toFixed(2).split('.');
+                 return { int: raw[0], dec: raw[1] };
+             },
+
+             initRefresh() {
+                 // Initial refresh when component loads
+                 this.refreshTimer = setInterval(() => {
+                     if (document.visibilityState === 'visible') {
+                         $wire.call('refreshLiveLeAD');
+                     }
+                 }, 5000);
+
+                 // Handle visibility changes
+                 document.addEventListener('visibilitychange', () => {
+                     if (document.visibilityState === 'hidden') {
+                         clearInterval(this.refreshTimer);
+                         this.refreshTimer = null;
+                     } else {
+                         // Immediate refresh when tab becomes visible again
+                         $wire.call('refreshLiveLeAD');
+                         // Restart interval if not already running
+                         if (!this.refreshTimer) {
+                             this.initRefresh();
+                         }
+                     }
+                 });
+             },
+
+             init() {
+                 // Start the refresh cycle
+                 this.initRefresh();
+
+                 // Clean up when component is destroyed
+                 this.$cleanup = () => {
+                     if (this.refreshTimer) {
+                         clearInterval(this.refreshTimer);
+                         this.refreshTimer = null;
+                     }
+                 };
+             }
+         };
+     })()"
+             @currency-updated.window="is_dollar = $event.detail.is_dollar">
+
+          <template x-for="lead in leads" :key="lead.id" wire:poll.keep-alive="refreshLiveLeAD">
+            <div class=" slide-animate swiper-slide card text-white me-2 p-2 rounded-3"
+                 style="cursor: pointer; max-width: 200px;   "
+                 data-bs-html="true"
+                 data-bs-toggle="tooltip"
+                 data-bs-placement="bottom"
+                 :data-bs-original-title="
+      `<div class='text-start '>
+     <p class='m-0'>User Name: <span class='fw-bold'>${lead.user}</span></p>
+     ${lead.is_cashout
+       ? `<p class='m-0'>Withdrawal: ${lead.offer_name}</p>`
+       : `<p class='m-0'>Offer Name: ${lead.offer_name}</p><p class='m-0'>Offerwall: ${lead.provider}</p>`
+     }
+
+
+     <p class='m-0'>Reward: ${lead.reward} ${coinName}  </p>
+        </div>`"
+
+
+            >
+              <div class="card-body p-0 pb-0 text-center" @click="$dispatch('activity-lead', {id: lead.user_id})">
+                <div class="d-flex justify-content-center gap-2">
+                  <div class="align-items-center">
+                    <img :src="lead.image"
+                         :alt="lead.provider + ' - ' + lead.offer_name"
+                         class="bg-secondary bg-opacity-50 rounded-3 text-white p-1"
+                         style="width: 35px;" loading="lazy">
+                  </div>
+                  <div class="d-flex flex-column text-start align-items-start text-truncate">
+                    <span class="mb-0 small text-truncate" x-text="lead.user" style="max-width: 98%"></span>
+                    <h6 class="h6-offer text-secondary pb-0 mb-0 mt-1 m-0 p-0 lh-1" x-text="lead.provider"></h6>
+                  </div>
+                  <div class="p-1">
+                    <div class="f-w-600">
+                      <span class="badge bg-dark text-white">
+                        <span class="d-flex align-items-center f-md">
+                          <!-- Coins when is_dollar = false -->
+                          <template x-if="!is_dollar">
+                            <span class="d-flex align-items-center fw-bold">
+                              <img :src="coinIcon"
+                                   alt="Coin Icon"
+                                   width="12"
+                                   class="me-1"
+                                   loading="lazy">
+                              <span x-text="lead.reward"></span>
+                            </span>
+                          </template>
+                          <!-- Dollars when is_dollar = true -->
+                          <template x-if="is_dollar">
+                            <span class="d-flex align-items-end me-1" style="font-size: 15px; line-height: 16px;">
+                              $<span x-text="splittedDollar(lead.reward).int"></span>.<span
+                                style="font-size: 10px; line-height: 12px;"
+                                x-text="splittedDollar(lead.reward).dec"></span>
+                            </span>
+                          </template>
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+
+
+        </div>
+
+      </div>
+
+
+    </div>
+  </div>
+
+</div>
+
+

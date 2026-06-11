@@ -7,31 +7,19 @@ const statusDot = document.getElementById("statusDot");
 const statusText = document.getElementById("statusText");
 const paginationEl = document.getElementById("pagination");
 const topOffersGrid = document.getElementById("topOffersGrid");
-const sourceTotal = document.getElementById("sourceTotal");
-const summaryEvents = document.getElementById("summaryEvents");
-const summaryOnline = document.getElementById("summaryOnline");
-const summaryView = document.getElementById("summaryView");
-const summaryLast = document.getElementById("summaryLast");
 
 let activeSource = "all";
 let currentPage = 1;
 let totalPages = 1;
 let pageSize = 30;
-let historyPages = 30;
-let lastServerlessRefresh = 0;
-
-const isServerlessHost =
-  location.hostname.includes("vercel.app") ||
-  location.hostname.includes("netlify.app") ||
-  location.hostname.includes("netlifyglobalcdn.com");
+let historyPages = 3;
 
 /** @type {Map<string, { name: string, color: string }>} */
 const sourceMeta = new Map();
 /** @type {FeedEvent[]} */
 let allEvents = [];
-/** @type {Array<Record<string, any>>} */
+/** @type {unknown[]} */
 let cachedSources = [];
-let latestStats = { total: 0, sources: {} };
 
 /**
  * @typedef {Object} FeedEvent
@@ -63,14 +51,14 @@ function formatTimeAbsolute(iso) {
       second: "2-digit",
     });
   } catch {
-    return "--";
+    return "—";
   }
 }
 
 function formatTimeRelative(iso) {
   try {
     const d = new Date(iso);
-    const sec = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+    const sec = Math.floor((Date.now() - d.getTime()) / 1000);
     if (sec < 60) return `${sec}s ago`;
     if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
     if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
@@ -80,68 +68,34 @@ function formatTimeRelative(iso) {
   }
 }
 
-function shortSourceName(id) {
-  if (id === "all") return "All";
-  return sourceMeta.get(id)?.name || id;
-}
-
-function updateSummary(sources = cachedSources, pagination = null) {
-  const list = Array.isArray(sources) ? sources : [];
-  const online = list.filter((s) => s.health?.status === "ok").length;
-  const currentList = filteredEvents();
-  const total = pagination?.total ?? currentList.length;
-  summaryEvents.textContent = String(total);
-  summaryOnline.textContent = `${online}/${list.length || 0}`;
-  summaryView.textContent = shortSourceName(activeSource);
-  summaryLast.textContent = currentList[0]?.at ? formatTimeRelative(currentList[0].at) : "Waiting";
-  sourceTotal.textContent = String(list.length || 0);
-}
-
 function displayAmount(e) {
   if (e.rawAmount) return e.rawAmount;
-  if (e.unit === "USD") return `$${Number(e.amount || 0).toFixed(2)}`;
-  return `${e.amount} ${e.unit || "points"}`;
+  if (e.unit === "USD") return `$${e.amount.toFixed(2)}`;
+  return `${e.amount}💰`;
 }
 
 /**
  * @param {FeedEvent} e
  */
 function offerLines(e) {
-  const normalizedOffer = String(e.offer || "").replace(/→/g, "->");
-  const wall = e.offerwall || normalizedOffer.split(" -> ")[0]?.trim() || normalizedOffer || "Offer";
+  const wall = e.offerwall || e.offer?.split(" → ")[0]?.trim() || e.offer;
   let task = (e.offerName || "").trim();
-  if (!task && normalizedOffer.includes(" -> ")) {
-    const part = normalizedOffer.split(" -> ").slice(1).join(" -> ").trim();
+  if (!task && e.offer?.includes(" → ")) {
+    const part = e.offer.split(" → ").slice(1).join(" → ").trim();
     if (part && !part.startsWith("@")) task = part;
   }
   return { wall, task };
 }
 
-function escapeHtml(s) {
-  const d = document.createElement("div");
-  d.textContent = String(s ?? "");
-  return d.innerHTML;
-}
-
-function withRefresh(params, force = false) {
-  if (!isServerlessHost) return params;
-  const now = Date.now();
-  if (force || now - lastServerlessRefresh > 12000) {
-    params.set("refresh", "1");
-    lastServerlessRefresh = now;
-  }
-  return params;
-}
-
 function renderTickerCard(e) {
   const color = sourceMeta.get(e.source)?.color || "#22d3a8";
   const { wall, task } = offerLines(e);
-  const country = e.country ? ` - ${e.country}` : "";
-  const priv = e.isPrivate ? "Private " : "";
+  const country = e.country ? `🌍 ${e.country}` : "";
+  const priv = e.isPrivate ? "🔒 " : "";
   return `<div class="ticker-card" style="--src-color:${color}">
     <span class="src">${escapeHtml(e.sourceName)}</span>
-    <span class="user">${escapeHtml(e.user)}${escapeHtml(country)}</span>
-    <span class="offer"><strong>${escapeHtml(priv + wall)}</strong>${task ? ` - <em>${escapeHtml(task)}</em>` : ""}</span>
+    <span class="user">${escapeHtml(e.user)}${country ? ` · ${escapeHtml(country)}` : ""}</span>
+    <span class="offer"><strong>${priv}${escapeHtml(wall)}</strong>${task ? ` · <em>${escapeHtml(task)}</em>` : ""}</span>
     <span class="amt">${escapeHtml(displayAmount(e))}</span>
     <span class="time-mini">${escapeHtml(formatTimeRelative(e.at))}</span>
   </div>`;
@@ -153,12 +107,14 @@ function renderTickerCard(e) {
 function renderFeedItem(e) {
   const color = sourceMeta.get(e.source)?.color || "#22d3a8";
   const { wall, task } = offerLines(e);
-  const priv = e.isPrivate ? '<span class="private-badge">Private</span>' : "";
-  const countryLine = e.country ? `<span class="country-line">${escapeHtml(e.country)}</span>` : "";
-  const offerLine = task
-    ? `<span class="offer-task"><span class="offer-label">Offer</span>${escapeHtml(task)}</span>`
+  const priv = e.isPrivate ? '<span class="private-badge">🔒 Private</span>' : "";
+  const countryLine = e.country
+    ? `<span class="country-line">🌍 ${escapeHtml(e.country)}</span>`
     : "";
-  return `<li class="feed-item" data-id="${escapeHtml(e.id)}" style="--src-color:${color}">
+  const offerLine = task
+    ? `<span class="offer-task"><span class="offer-label">Offer:</span> ${escapeHtml(task)}</span>`
+    : "";
+  return `<li class="feed-item" data-id="${e.id}" style="--src-color:${color}">
     <span class="badge">${escapeHtml(e.sourceName)}</span>
     <div class="main">
       <strong>${escapeHtml(wall)}</strong>${priv}
@@ -174,6 +130,12 @@ function renderFeedItem(e) {
   </li>`;
 }
 
+function escapeHtml(s) {
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
 function filteredEvents() {
   if (activeSource === "all") return allEvents;
   return allEvents.filter((e) => e.source === activeSource);
@@ -182,11 +144,21 @@ function filteredEvents() {
 function renderTicker() {
   const list = filteredEvents().slice(0, 30);
   if (!list.length) {
-    tickerInner.innerHTML = '<div class="ticker-card"><span class="offer">Loading live feeds...</span></div>';
+    tickerInner.innerHTML = "";
     return;
   }
   const cards = list.map(renderTickerCard).join("");
   tickerInner.innerHTML = cards + cards;
+}
+
+function renderFeedFromCache() {
+  const list = filteredEvents().slice(0, pageSize);
+  if (!list.length) return false;
+  feedList.innerHTML = list.map(renderFeedItem).join("");
+  const total = filteredEvents().length;
+  feedCount.textContent =
+    total > pageSize ? `${pageSize} of ${total} events` : `${total} events`;
+  return true;
 }
 
 function renderPagination(pagination) {
@@ -201,15 +173,15 @@ function renderPagination(pagination) {
   const buttons = [];
   for (let p = 1; p <= totalPages; p++) {
     buttons.push(
-      `<button type="button" class="page-btn ${p === currentPage ? "active" : ""}" data-page="${p}">${p}</button>`
+      `<button type="button" class="page-btn ${p === currentPage ? "active" : ""}" data-page="${p}">Page ${p}</button>`
     );
   }
 
   paginationEl.innerHTML = `
-    <button type="button" class="page-btn" data-page="prev" ${pagination.hasPrev ? "" : "disabled"}>Prev</button>
+    <button type="button" class="page-btn" data-page="prev" ${pagination.hasPrev ? "" : "disabled"}>← Prev</button>
     ${buttons.join("")}
-    <button type="button" class="page-btn" data-page="next" ${pagination.hasNext ? "" : "disabled"}>Next</button>
-    <span class="page-info">${pagination.total} total - ${pageSize}/page</span>
+    <button type="button" class="page-btn" data-page="next" ${pagination.hasNext ? "" : "disabled"}>Next →</button>
+    <span class="page-info">${pagination.total} total · ${pageSize}/page</span>
   `;
 
   paginationEl.querySelectorAll(".page-btn").forEach((btn) => {
@@ -217,92 +189,86 @@ function renderPagination(pagination) {
       const raw = btn.getAttribute("data-page");
       if (btn.disabled || !raw) return;
       if (raw === "prev" && currentPage > 1) loadFeedPage(currentPage - 1);
-      else if (raw === "next" && currentPage < totalPages) loadFeedPage(currentPage + 1);
+      else if (raw === "next" && currentPage < totalPages)
+        loadFeedPage(currentPage + 1);
       else if (raw !== "prev" && raw !== "next") loadFeedPage(Number(raw));
     });
   });
 }
 
-async function loadFeedPage(page = 1, opts = {}) {
+async function loadFeedPage(page = 1) {
   const params = new URLSearchParams({
     source: activeSource,
     page: String(page),
     pageSize: String(pageSize),
   });
-  withRefresh(params, Boolean(opts.forceRefresh));
   const res = await fetch(`/api/feed?${params}`);
   const data = await res.json();
   const list = data.events || [];
   const pag = data.pagination;
-  latestStats = data.stats || latestStats;
 
-  for (const s of data.sources || []) {
-    sourceMeta.set(s.id, { name: s.name, color: s.color || "#22d3a8" });
-  }
-  if (activeSource === "all" && list.length) {
-    mergeEvents(list, false, { skipReload: true });
-  }
-
-  feedCount.textContent = pag ? `Page ${pag.page}/${pag.totalPages} - ${pag.total} events` : `${list.length} events`;
+  feedCount.textContent = pag
+    ? `Page ${pag.page}/${pag.totalPages} · ${pag.total} events`
+    : `${list.length} events`;
 
   if (!list.length) {
-    const current = shortSourceName(activeSource);
-    const message =
+    const srcName =
       activeSource === "all"
-        ? "No history on this page yet."
-        : `${current} has no visible rows right now. Show all sites to see the live feed.`;
-    feedList.innerHTML = `<li class="empty">
-      <p>${escapeHtml(message)}</p>
-      ${activeSource === "all" ? "" : '<button type="button" class="empty-action" id="showAllFeed">Show all sites</button>'}
-    </li>`;
-    document.getElementById("showAllFeed")?.addEventListener("click", async () => {
-      activeSource = "all";
-      currentPage = 1;
-      renderFilters(cachedSources);
-      renderTicker();
-      await loadFeedPage(1);
-      await loadTopOffers();
-    });
+        ? "this filter"
+        : sourceMeta.get(activeSource)?.name || activeSource;
+    feedList.innerHTML = `<li class="empty">No events for ${escapeHtml(srcName)} yet.</li>`;
   } else {
     feedList.innerHTML = list.map(renderFeedItem).join("");
   }
 
   renderPagination(pag);
-  updateSummary(cachedSources, pag);
 }
 
 async function loadTopOffers() {
-  const params = new URLSearchParams({ source: activeSource, limit: "8" });
-  withRefresh(params);
+  const params = new URLSearchParams({ source: activeSource, limit: "6" });
   const res = await fetch(`/api/top-offers?${params}`);
   const data = await res.json();
   const bySource = data.bySource || {};
   const entries = Object.entries(bySource);
 
   if (!entries.length) {
-    topOffersGrid.innerHTML = '<p class="empty">Collecting today data... check back in a minute.</p>';
+    topOffersGrid.innerHTML =
+      '<p class="empty">No top offers recorded yet today.</p>';
     return;
   }
+
+  const renderRows = (rows, valueKey) =>
+    rows
+      .map(
+        (o) => `
+        <div class="top-offer-row">
+          <span class="rank">#${o.rank}</span>
+          <span class="name" title="${escapeHtml(o.offer)}">${escapeHtml(o.offer)}</span>
+          <span class="hits">${valueKey === "count" ? `${o.count}×` : escapeHtml(o.maxRawAmount || o.maxAmount)}</span>
+        </div>`
+      )
+      .join("");
 
   topOffersGrid.innerHTML = entries
     .map(([sourceId, block]) => {
       const meta = sourceMeta.get(sourceId);
       const name = meta?.name || sourceId;
       const color = meta?.color || "#22d3a8";
-      const rows = block.offers
-        .map(
-          (o) => `
-        <div class="top-offer-row">
-          <span class="rank">#${o.rank}</span>
-          <span class="name" title="${escapeHtml(o.offer)}">${escapeHtml(o.offer)}</span>
-          <span class="hits">${o.count}x</span>
-        </div>`
-        )
-        .join("");
+      const freq = block.byFrequency || block.offers || [];
+      const coins = block.byCoins || [];
       return `
       <article class="top-offers-card">
         <h3><span class="dot" style="background:${color}"></span>${escapeHtml(name)}</h3>
-        ${rows}
+        <div class="top-offers-split">
+          <div class="top-offers-col">
+            <h4>বেশি বার (${data.day || "today"})</h4>
+            ${freq.length ? renderRows(freq, "count") : '<p class="empty small">—</p>'}
+          </div>
+          <div class="top-offers-col">
+            <h4>বেশি coin 💰</h4>
+            ${coins.length ? renderRows(coins, "coins") : '<p class="empty small">—</p>'}
+          </div>
+        </div>
       </article>`;
     })
     .join("");
@@ -310,27 +276,17 @@ async function loadTopOffers() {
 
 function renderFilters(sources) {
   cachedSources = sources;
-  updateSummary(sources);
-  const statsBySource = latestStats.sources || {};
-  const totalCount = Number(latestStats.total || 0) ||
-    sources.reduce((sum, s) => sum + Number(s.health?.count || 0), 0);
   const buttons = [
-    { id: "all", name: "All sites", color: "#22d3a8", count: totalCount },
-    ...sources.map((s) => ({
-      id: s.id,
-      name: s.name,
-      color: s.color,
-      count: statsBySource[s.id] ?? s.health?.count ?? 0,
-    })),
+    { id: "all", name: "All sites", color: "#22d3a8" },
+    ...sources.map((s) => ({ id: s.id, name: s.name, color: s.color })),
   ];
 
   sourceFilters.innerHTML = buttons
     .map(
       (b) => `
-    <button type="button" class="filter-btn ${activeSource === b.id ? "active" : ""}" data-source="${b.id}" style="--src-color:${b.color}">
+    <button type="button" class="filter-btn ${activeSource === b.id ? "active" : ""}" data-source="${b.id}">
       <span class="dot" style="background:${b.color}"></span>
-      <span class="name">${escapeHtml(b.name)}</span>
-      <span class="filter-count">${escapeHtml(b.count)}</span>
+      ${escapeHtml(b.name)}
     </button>`
     )
     .join("");
@@ -341,6 +297,7 @@ function renderFilters(sources) {
       currentPage = 1;
       renderFilters(sources);
       renderTicker();
+      renderFeedFromCache();
       await loadFeedPage(1);
       await loadTopOffers();
     });
@@ -348,16 +305,31 @@ function renderFilters(sources) {
 }
 
 function renderHealth(sources) {
-  updateSummary(sources);
   sourceHealth.innerHTML = sources
     .map((s) => {
       const h = s.health;
-      const cls = h.status === "ok" ? "ok" : h.status === "error" ? "err" : "";
-      const latency = h.latencyMs ? `, ${(h.latencyMs / 1000).toFixed(1)}s` : "";
-      const added = h.added ? `, +${h.added}` : "";
-      const detail = h.status === "ok" ? `${h.count} items${added}${latency}` : h.lastError ? h.lastError.slice(0, 44) : "pending";
-      const note = h.note ? `<div class="health-note" title="${escapeHtml(h.note)}">${escapeHtml(h.note)}</div>` : "";
-      return `<div class="health-row"><span>${escapeHtml(s.name)}</span><span class="${cls}">${escapeHtml(detail)}</span></div>${note}`;
+      const cls =
+        h.status === "ok"
+          ? "ok"
+          : h.status === "error"
+            ? "err"
+            : h.status === "syncing"
+              ? "sync"
+              : "";
+      const detail =
+        h.status === "ok"
+          ? `${h.count} items${h.note ? ` · ${h.note}` : ""}`
+          : h.status === "syncing"
+            ? h.count > 0
+              ? `${h.count} cached`
+              : "syncing…"
+            : h.lastError
+              ? h.lastError.slice(0, 40)
+              : "syncing…";
+      const note = h.note
+        ? `<div class="health-note" title="${escapeHtml(h.note)}">${escapeHtml(h.note)}</div>`
+        : "";
+      return `<div class="health-row"><span>${escapeHtml(s.name)}</span><span class="${cls}">${detail}</span></div>${note}`;
     })
     .join("");
 }
@@ -365,7 +337,7 @@ function renderHealth(sources) {
 /**
  * @param {FeedEvent[]} events
  */
-function mergeEvents(events, prepend = false, opts = {}) {
+function mergeEvents(events, prepend = false) {
   if (!events.length) return;
   const map = new Map(allEvents.map((e) => [e.id, e]));
   for (const e of events) {
@@ -375,30 +347,23 @@ function mergeEvents(events, prepend = false, opts = {}) {
   let list = [...map.values()];
   if (prepend) {
     const newIds = new Set(events.map((e) => e.id));
-    const head = events
-      .map((e) => map.get(e.id))
-      .filter(Boolean)
-      .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+    const head = events.map((e) => map.get(e.id)).filter(Boolean);
     const rest = list.filter((e) => !newIds.has(e.id));
     list = [...head, ...rest];
+  } else {
+    list.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
   }
-  list.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
   allEvents = list.slice(0, 500);
-  updateSummary(cachedSources);
   renderTicker();
-  if (currentPage === 1 && !opts.skipReload) loadFeedPage(1);
-  if (!opts.skipReload) loadTopOffers();
+  if (currentPage === 1) loadFeedPage(1);
+  loadTopOffers();
 }
 
 async function loadInitial() {
-  const bootParams = new URLSearchParams({
-    source: activeSource,
-    limit: String(pageSize * historyPages),
-  });
-  withRefresh(bootParams, true);
-  const bootstrap = await fetch(`/api/feed?${bootParams}`);
+  const bootstrap = await fetch(
+    `/api/feed?source=${activeSource}&limit=${pageSize * historyPages}`
+  );
   const bootData = await bootstrap.json();
-  latestStats = bootData.stats || latestStats;
   for (const s of bootData.sources) {
     sourceMeta.set(s.id, { name: s.name, color: s.color || "#22d3a8" });
   }
@@ -408,26 +373,16 @@ async function loadInitial() {
   }
   allEvents = bootData.events || [];
 
-  const pageParams = new URLSearchParams({ source: activeSource, page: "1" });
-  withRefresh(pageParams);
-  const res = await fetch(`/api/feed?${pageParams}`);
+  const res = await fetch(`/api/feed?source=${activeSource}&page=1`);
   const data = await res.json();
-  latestStats = data.stats || latestStats;
   renderFilters(data.sources);
   renderHealth(data.sources);
   renderTicker();
-  statusDot.className = "status-dot live";
-  statusText.textContent = "Loaded";
   await loadFeedPage(1);
   await loadTopOffers();
 }
 
 function connectStream() {
-  if (isServerlessHost) {
-    statusDot.className = "status-dot live";
-    statusText.textContent = "Live refresh";
-    return;
-  }
   const es = new EventSource("/api/stream");
 
   es.onopen = () => {
@@ -445,37 +400,29 @@ function connectStream() {
         mergeEvents(msg.data, true);
       }
     } catch {
-      /* ignore malformed stream messages */
+      /* ignore */
     }
   };
 
   es.onerror = () => {
     statusDot.className = "status-dot error";
-    statusText.textContent = "Reconnecting...";
+    statusText.textContent = "Reconnecting…";
   };
 }
 
 setInterval(async () => {
   try {
-    const params = new URLSearchParams();
-    withRefresh(params);
-    const res = await fetch(`/api/sources${params.size ? `?${params}` : ""}`);
+    const res = await fetch("/api/sources");
     const data = await res.json();
-    latestStats = data.stats || latestStats;
     renderHealth(data.sources);
-    renderFilters(data.sources);
-    statusDot.className = "status-dot live";
-    if (statusText.textContent === "Connecting..." || statusText.textContent === "Reconnecting...") {
-      statusText.textContent = "Loaded";
-    }
     await loadTopOffers();
   } catch {
-    /* ignore transient refresh errors */
+    /* ignore */
   }
 }, 15000);
 
 setInterval(() => {
-  if (currentPage === 1) loadFeedPage(1, { forceRefresh: isServerlessHost });
-}, isServerlessHost ? 15000 : 60000);
+  if (currentPage === 1) loadFeedPage(1);
+}, 60000);
 
 loadInitial().then(connectStream);

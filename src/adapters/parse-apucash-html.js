@@ -37,7 +37,10 @@ export async function parseApucashHtml(html, source, profiles) {
   const events = [];
   const now = new Date().toISOString();
 
-  const wrappers = $("#last_offers [wire\\:key^='offer-']");
+  let wrappers = $("#last_offers [wire\\:key^='offer-']");
+  if (!wrappers.length) {
+    wrappers = $("[wire\\:key^='offer-']");
+  }
   for (let i = 0; i < wrappers.length; i++) {
     const wrapper = $(wrappers[i]);
     const block = wrapper.find(".offer-wrapper").first();
@@ -97,7 +100,7 @@ export async function parseApucashHtml(html, source, profiles) {
 
     const id = crypto
       .createHash("sha256")
-      .update(`${source.id}|${wireKey}|${user}|${offerwall}|${offerName}|${amountText}`)
+      .update(`${source.id}|${wireKey}|${user}|${offerwall}|${amountText}`)
       .digest("hex")
       .slice(0, 24);
 

@@ -1,19 +1,99 @@
-export const PAGE_SIZE = 30;
-export const HISTORY_PAGES = 30;
-const MAX_EVENTS = 5000;
+export const PAGE_SIZE = 50;
+export const SOURCE_HISTORY_LIMIT = 400;
+export const HISTORY_PAGES = Math.ceil(SOURCE_HISTORY_LIMIT / PAGE_SIZE);
+const DEDUPE_WINDOW_MS = 24 * 60 * 60 * 1000;
 /** @type {Map<string, import('./types.js').FeedEvent>} */
 const byId = new Map();
 
 /** @type {import('./types.js').FeedEvent[]} */
 let ordered = [];
 
-function timeValue(event) {
-  const time = Date.parse(String(event?.at || ""));
+function toTime(event) {
+  const time = new Date(event?.at || 0).getTime();
   return Number.isFinite(time) ? time : 0;
 }
 
-function sortNewestFirst(list) {
-  return list.sort((a, b) => timeValue(b) - timeValue(a));
+function sortNewestFirst() {
+  ordered.sort((a, b) => toTime(b) - toTime(a));
+}
+
+function normalizeKeyPart(value) {
+  return String(value ?? "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Same user + same offer + same amount should not be inserted repeatedly when
+ * a source refreshes a ticker with slightly different relative timestamps.
+ * @param {import('./types.js').FeedEvent} event
+ */
+function semanticKey(event) {
+  return [
+    event.source,
+    normalizeKeyPart(event.userId || event.user),
+    normalizeKeyPart(event.offerwall),
+    normalizeKeyPart(event.offerName || event.offer),
+    Number(event.amount || 0).toFixed(4),
+    normalizeKeyPart(event.unit || ""),
+  ].join("|");
+}
+
+/**
+ * @param {import('./types.js').FeedEvent} event
+ */
+function findRecentDuplicate(event) {
+  const incomingKey = semanticKey(event);
+  const incomingTime = toTime(event) || Date.now();
+  return ordered.find((existing) => {
+    if (existing.id === event.id) return false;
+    if (semanticKey(existing) !== incomingKey) return false;
+    const existingTime = toTime(existing) || incomingTime;
+    return Math.abs(incomingTime - existingTime) <= DEDUPE_WINDOW_MS;
+  });
+}
+
+/**
+ * @param {import('./types.js').FeedEvent} existing
+ * @param {import('./types.js').FeedEvent} incoming
+ */
+function mergeEvent(existing, incoming) {
+  let changed = false;
+  if (!existing.offerName && incoming.offerName) {
+    existing.offerName = incoming.offerName;
+    existing.offer = incoming.offer;
+    changed = true;
+  }
+  if (!existing.country && incoming.country) {
+    existing.country = incoming.country;
+    changed = true;
+  }
+  if (!existing.userId && incoming.userId) {
+    existing.userId = incoming.userId;
+    changed = true;
+  }
+  if (!existing.rawAmount && incoming.rawAmount) {
+    existing.rawAmount = incoming.rawAmount;
+    changed = true;
+  }
+  if (incoming.isPrivate && !existing.isPrivate) {
+    existing.isPrivate = true;
+    changed = true;
+  }
+  return changed;
+}
+
+function trimSourceHistory(sourceId) {
+  const sourceEvents = ordered.filter((event) => event.source === sourceId);
+  if (sourceEvents.length <= SOURCE_HISTORY_LIMIT) return;
+  sourceEvents.sort((a, b) => toTime(b) - toTime(a));
+  const keep = new Set(sourceEvents.slice(0, SOURCE_HISTORY_LIMIT).map((event) => event.id));
+  const drop = sourceEvents
+    .slice(SOURCE_HISTORY_LIMIT)
+    .map((event) => event.id);
+  for (const id of drop) byId.delete(id);
+  ordered = ordered.filter((event) => event.source !== sourceId || keep.has(event.id));
 }
 
 /**
@@ -53,24 +133,16 @@ function enrichPaidcashPeer(incoming) {
 export function upsertEvent(event) {
   const existing = byId.get(event.id);
   if (existing) {
-    let changed = false;
-    if (!existing.offerName && event.offerName) {
-      existing.offerName = event.offerName;
-      existing.offer = event.offer;
-      changed = true;
-    }
-    if (!existing.country && event.country) {
-      existing.country = event.country;
-      changed = true;
-    }
-    return changed;
+    return mergeEvent(existing, event);
+  }
+  const duplicate = findRecentDuplicate(event);
+  if (duplicate) {
+    mergeEvent(duplicate, event);
+    return false;
   }
   byId.set(event.id, event);
   ordered.unshift(event);
-  if (ordered.length > MAX_EVENTS) {
-    const removed = ordered.pop();
-    if (removed) byId.delete(removed.id);
-  }
+  trimSourceHistory(event.source);
   return true;
 }
 
@@ -98,8 +170,29 @@ export function upsertMany(events) {
       }
     }
   }
-  sortNewestFirst(ordered);
   return added;
+}
+
+export function compactDuplicateEvents() {
+  sortNewestFirst();
+  const kept = [];
+  const seen = new Map();
+  let removed = 0;
+  for (const event of ordered) {
+    const key = semanticKey(event);
+    const time = toTime(event) || Date.now();
+    const prev = seen.get(key);
+    if (prev && Math.abs(time - prev.time) <= DEDUPE_WINDOW_MS) {
+      mergeEvent(prev.event, event);
+      byId.delete(event.id);
+      removed += 1;
+      continue;
+    }
+    seen.set(key, { time, event });
+    kept.push(event);
+  }
+  ordered = kept;
+  return removed;
 }
 
 /**
@@ -149,9 +242,13 @@ export function getEvents(opts = {}) {
  */
 function getFilteredList(source) {
   if (source && source !== "all") {
-    return sortNewestFirst(ordered.filter((e) => e.source === source));
+    return ordered
+      .filter((e) => e.source === source)
+      .slice()
+      .sort((a, b) => toTime(b) - toTime(a))
+      .slice(0, SOURCE_HISTORY_LIMIT);
   }
-  return sortNewestFirst([...ordered]);
+  return ordered.slice().sort((a, b) => toTime(b) - toTime(a));
 }
 
 /**
@@ -165,10 +262,7 @@ export function getEventsPaginated(opts = {}) {
   const page = Math.max(1, Number(opts.page) || 1);
   const list = getFilteredList(opts.source);
   const total = list.length;
-  const totalPages = Math.min(
-    HISTORY_PAGES,
-    Math.max(1, Math.ceil(total / pageSize) || 1)
-  );
+  const totalPages = Math.max(1, Math.ceil(total / pageSize) || 1);
   const safePage = Math.min(page, totalPages);
   const start = (safePage - 1) * pageSize;
   const events = list.slice(start, start + pageSize);
@@ -189,15 +283,8 @@ export function getEventsPaginated(opts = {}) {
 /** @type {string} */
 let impressionDay = "";
 
-/** @type {Map<string, Map<string, { offer: string, count: number }>>} */
+/** @type {Map<string, Map<string, { offer: string, count: number, maxAmount: number, maxRawAmount: string, unit: string }>>} */
 const dailyOfferCounts = new Map();
-
-function normalizeText(value) {
-  return String(value ?? "")
-    .replace(/â†’|→/g, "->")
-    .replace(/\s+/g, " ")
-    .trim();
-}
 
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
@@ -223,17 +310,36 @@ export function recordDailyImpressions(sourceId, events) {
   for (const ev of events) {
     const label =
       typeof ev === "string"
-        ? normalizeText(ev)
+        ? ev
         : ev.offerName
-          ? normalizeText(`${ev.offerwall || ""} -> ${ev.offerName}`.replace(/^ -> /, ""))
-          : normalizeText(ev.offer || ev.offerwall || "");
+          ? `${ev.offerwall || ""} → ${ev.offerName}`.replace(/^ → /, "")
+          : ev.offer || ev.offerwall || "";
     const key = label.toLowerCase().trim();
     if (!key) continue;
+    const amount = typeof ev === "object" && ev != null ? Number(ev.amount) || 0 : 0;
+    const unit = typeof ev === "object" && ev?.unit ? String(ev.unit) : "coins";
+    const rawAmount =
+      typeof ev === "object" && ev?.rawAmount
+        ? String(ev.rawAmount)
+        : amount > 0
+          ? `${amount} ${unit}`
+          : "";
     const row = bucket.get(key);
     if (row) {
       row.count += 1;
+      if (amount > row.maxAmount) {
+        row.maxAmount = amount;
+        row.maxRawAmount = rawAmount || row.maxRawAmount;
+        row.unit = unit;
+      }
     } else {
-      bucket.set(key, { offer: label, count: 1 });
+      bucket.set(key, {
+        offer: label,
+        count: 1,
+        maxAmount: amount,
+        maxRawAmount: rawAmount,
+        unit,
+      });
     }
   }
 }
@@ -246,21 +352,30 @@ export function getDailyTopOffers(opts = {}) {
   const limit = Math.min(15, Math.max(1, Number(opts.limit) || 8));
   const filterSource = opts.source && opts.source !== "all" ? opts.source : null;
 
-  /** @type {Record<string, { source: string, offers: { offer: string, count: number, rank: number }[] }>} */
+  /** @type {Record<string, { source: string, byFrequency: { offer: string, count: number, maxAmount: number, maxRawAmount: string, rank: number }[], byCoins: { offer: string, count: number, maxAmount: number, maxRawAmount: string, rank: number }[] }>} */
   const bySource = {};
 
   for (const [sourceId, bucket] of dailyOfferCounts) {
     if (filterSource && sourceId !== filterSource) continue;
-    const sorted = [...bucket.values()]
-      .sort((a, b) => b.count - a.count)
+    const rows = [...bucket.values()];
+    const mapRow = (row, rank) => ({
+      offer: row.offer,
+      count: row.count,
+      maxAmount: row.maxAmount,
+      maxRawAmount: row.maxRawAmount || `${row.maxAmount} ${row.unit}`,
+      rank,
+    });
+    const byFrequency = rows
+      .sort((a, b) => b.count - a.count || b.maxAmount - a.maxAmount)
       .slice(0, limit)
-      .map((row, i) => ({
-        offer: row.offer,
-        count: row.count,
-        rank: i + 1,
-      }));
-    if (sorted.length) {
-      bySource[sourceId] = { source: sourceId, offers: sorted };
+      .map((row, i) => mapRow(row, i + 1));
+    const byCoins = rows
+      .filter((row) => row.maxAmount > 0)
+      .sort((a, b) => b.maxAmount - a.maxAmount || b.count - a.count)
+      .slice(0, limit)
+      .map((row, i) => mapRow(row, i + 1));
+    if (byFrequency.length || byCoins.length) {
+      bySource[sourceId] = { source: sourceId, byFrequency, byCoins };
     }
   }
 
@@ -278,45 +393,8 @@ export function getStats() {
   return {
     total: ordered.length,
     sources,
-    lastUpdated: sortNewestFirst([...ordered])[0]?.at ?? null,
+    lastUpdated: ordered[0]?.at ?? null,
   };
-}
-
-export function exportStoreState() {
-  const daily = {};
-  for (const [sourceId, bucket] of dailyOfferCounts) {
-    daily[sourceId] = [...bucket.entries()];
-  }
-  return {
-    version: 1,
-    savedAt: new Date().toISOString(),
-    events: sortNewestFirst([...ordered]),
-    impressionDay,
-    dailyOfferCounts: daily,
-  };
-}
-
-export function hydrateStoreState(state) {
-  if (!state || !Array.isArray(state.events)) return;
-  byId.clear();
-  ordered = [];
-  for (const event of state.events.slice(0, MAX_EVENTS)) {
-    if (!event?.id) continue;
-    byId.set(event.id, event);
-    ordered.push(event);
-  }
-  sortNewestFirst(ordered);
-  impressionDay = typeof state.impressionDay === "string" ? state.impressionDay : "";
-  rebuildDailyOfferCounts();
-}
-
-function rebuildDailyOfferCounts() {
-  impressionDay = todayKey();
-  dailyOfferCounts.clear();
-  for (const ev of ordered) {
-    if (!ev?.at || !String(ev.at).startsWith(impressionDay)) continue;
-    recordDailyImpressions(ev.source, [ev]);
-  }
 }
 
 /** @type {Set<import('http').ServerResponse>} */
@@ -336,4 +414,75 @@ export function broadcastNew(newEvents) {
   for (const client of sseClients) {
     client.write(`data: ${payload}\n\n`);
   }
+}
+
+/**
+ * Restore in-memory feed + daily top offers from disk/blob.
+ * @param {Record<string, unknown> | null | undefined} state
+ */
+export function hydrateStoreState(state) {
+  if (!state || typeof state !== "object") return;
+  byId.clear();
+  ordered = [];
+
+  const events = Array.isArray(state.events) ? state.events : [];
+  for (let i = events.length - 1; i >= 0; i--) {
+    const ev = events[i];
+    if (!ev?.id) continue;
+    byId.set(ev.id, ev);
+    ordered.unshift(ev);
+  }
+  sortNewestFirst();
+  compactDuplicateEvents();
+  const sourceIds = new Set(ordered.map((event) => event.source));
+  for (const sourceId of sourceIds) trimSourceHistory(sourceId);
+  sortNewestFirst();
+
+  impressionDay = typeof state.impressionDay === "string" ? state.impressionDay : "";
+  dailyOfferCounts.clear();
+  const rawDaily = state.dailyOfferCounts;
+  if (rawDaily && typeof rawDaily === "object") {
+    for (const [sourceId, bucketRaw] of Object.entries(rawDaily)) {
+      /** @type {Map<string, { offer: string, count: number, maxAmount: number, maxRawAmount: string, unit: string }>} */
+      const bucket = new Map();
+      if (Array.isArray(bucketRaw)) {
+        for (const entry of bucketRaw) {
+          if (!Array.isArray(entry) || entry.length < 2) continue;
+          const [key, row] = entry;
+          if (!key || !row || typeof row !== "object") continue;
+          bucket.set(String(key), {
+            offer: String(row.offer || key),
+            count: Number(row.count) || 0,
+            maxAmount: Number(row.maxAmount) || 0,
+            maxRawAmount: String(row.maxRawAmount || ""),
+            unit: String(row.unit || "coins"),
+          });
+        }
+      }
+      if (bucket.size) dailyOfferCounts.set(sourceId, bucket);
+    }
+  }
+  resetDailyIfNeeded();
+  dailyOfferCounts.clear();
+  for (const event of ordered) {
+    if (String(event.at || "").slice(0, 10) === impressionDay) {
+      recordDailyImpressions(event.source, [event]);
+    }
+  }
+}
+
+export function exportStoreState() {
+  /** @type {Record<string, [string, { offer: string, count: number, maxAmount: number, maxRawAmount: string, unit: string }][]>} */
+  const dailyOfferCountsOut = {};
+  for (const [sourceId, bucket] of dailyOfferCounts) {
+    dailyOfferCountsOut[sourceId] = [...bucket.entries()];
+  }
+  return {
+    version: 1,
+    savedAt: new Date().toISOString(),
+    events: ordered.slice().sort((a, b) => toTime(b) - toTime(a)),
+    sourceHistoryLimit: SOURCE_HISTORY_LIMIT,
+    impressionDay: impressionDay || todayKey(),
+    dailyOfferCounts: dailyOfferCountsOut,
+  };
 }

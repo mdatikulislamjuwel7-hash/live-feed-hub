@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin — Custom Offers</title>
+  <link rel="stylesheet" href="/styles.css?v=7" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-icon" aria-hidden="true">⚡</span>
+      <div>
+        <h1>Custom Offers Admin</h1>
+        <p class="tagline">নিজের offer add করুন, click URL ও postback URL copy করুন</p>
+      </div>
+    </div>
+    <div class="topbar-meta">
+      <a class="admin-link" href="/">Dashboard</a>
+    </div>
+  </header>
+
+  <main class="admin-layout">
+    <section class="admin-card">
+      <h2>Add / Update Offer</h2>
+      <form id="offerForm" class="admin-form">
+        <input type="hidden" id="offerId" />
+        <label>
+          Offer name
+          <input id="offerName" required placeholder="Example: Install App and Register" />
+        </label>
+        <label>
+          Offerwall / Network
+          <input id="offerwall" required placeholder="Custom / Gemiad / Offery" />
+        </label>
+        <label>
+          Reward amount
+          <input id="reward" type="number" step="0.01" min="0" required placeholder="1500" />
+        </label>
+        <label>
+          Unit
+          <input id="unit" placeholder="coins" value="coins" />
+        </label>
+        <label>
+          Country
+          <input id="country" placeholder="US / BD / Worldwide" />
+        </label>
+        <label>
+          Target URL
+          <input id="targetUrl" placeholder="https://example.com/?click_id={click_id}" />
+        </label>
+        <label>
+          Postback secret
+          <input id="postbackSecret" placeholder="Auto generated if empty" />
+        </label>
+        <label>
+          Forward postback URL (optional)
+          <input id="externalPostbackUrl" placeholder="https://your-other-url.com/pb?txid={txid}" />
+        </label>
+        <label class="checkbox-row">
+          <input id="active" type="checkbox" checked />
+          Active
+        </label>
+        <div class="admin-actions">
+          <button type="submit">Save offer</button>
+          <button type="button" id="resetForm" class="secondary">New</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="admin-card">
+      <div class="admin-head">
+        <h2>Custom Offers</h2>
+        <button type="button" id="refreshOffers" class="secondary">Refresh</button>
+      </div>
+      <div id="adminStatus" class="admin-status"></div>
+      <div id="offersList" class="admin-offers"></div>
+    </section>
+  </main>
+
+  <script src="/admin.js?v=1" type="module"></script>
+</body>
+</html>

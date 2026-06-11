@@ -104,7 +104,7 @@ export async function fetchUserProfile(page, userId) {
     window.Livewire?.dispatch?.("openProfileModal", { userId: id });
   }, userId);
 
-  await new Promise((r) => setTimeout(r, 2200));
+  await new Promise((r) => setTimeout(r, 1200));
 
   const parsed = await page.evaluate(() => {
     const modal = document.querySelector("#profileModal .modal-dialog");

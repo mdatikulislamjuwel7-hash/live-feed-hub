@@ -29,6 +29,14 @@ export async function fetchNetlifySource(source) {
       return (await import("./adapters/trevbucks-livewire.js")).fetchTrevbucksLivewire(source);
     case "splitdrop-public":
       return (await import("./adapters/splitdrop-public.js")).fetchSplitdropPublic(source);
+    case "earnfino-leaderboard":
+      return (await import("./adapters/earnfino-leaderboard.js")).fetchEarnfinoLeaderboard(source);
+    case "swiper-csm-feed":
+      return (await import("./adapters/swiper-csm-feed.js")).fetchSwiperCsmFeed(source);
+    case "ticker-cards-html":
+      return (await import("./adapters/ticker-cards-html.js")).fetchTickerCardsHtml(source);
+    case "laravel-live-feed":
+      return (await import("./adapters/laravel-live-feed.js")).fetchLaravelLiveFeed(source);
     default:
       throw new Error(`Netlify does not support adapter type: ${source.type}`);
   }

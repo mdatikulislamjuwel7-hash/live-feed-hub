@@ -3,7 +3,8 @@ import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const localStatePath = join(__dirname, "..", ".data", "live-feed-state.json");
+const dataDir = process.env.DATA_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || join(__dirname, "..", ".data");
+const localStatePath = join(dataDir, "live-feed-state.json");
 const blobStoreName = "live-feed-hub";
 const blobKey = "state.json";
 const vercelBlobPath = "live-feed-state.json";
