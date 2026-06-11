@@ -28,7 +28,7 @@ const alertDedupeMs = Math.max(1, Number(process.env.TELEGRAM_ALERT_DEDUPE_HOURS
 const minCoinAlertAmount = Math.max(0, Number(process.env.TELEGRAM_MIN_COIN_AMOUNT || 200));
 const blockedOfferPatterns = String(
   process.env.TELEGRAM_BLOCK_OFFER_PATTERNS ||
-    "survey,mail verify,mail verification,email verify,email verification"
+    "survey,mail verify,mail verification,email verify,email verification,binance"
 )
   .split(",")
   .map((pattern) => pattern.trim().toLowerCase())
