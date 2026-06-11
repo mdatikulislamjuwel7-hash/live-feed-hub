@@ -132,7 +132,8 @@ function sourcePollRank(source) {
     type === "json-feed" ||
     type === "graphql-feed" ||
     type === "paidbyte-public" ||
-    type === "earnfino-leaderboard"
+    type === "earnfino-leaderboard" ||
+    type === "public-live-feed"
   ) {
     return 0;
   }

@@ -140,6 +140,39 @@
     "limit": 50
   },
   {
+    "id": "covencash",
+    "name": "Covencash",
+    "enabled": true,
+    "type": "public-live-feed",
+    "url": "https://covencash.com/",
+    "color": "#14b8a6",
+    "pollSeconds": 75,
+    "limit": 40
+  },
+  {
+    "id": "zombiecash",
+    "name": "ZombieCash",
+    "enabled": true,
+    "type": "public-live-feed",
+    "url": "https://zombiecash.site/register/",
+    "publicFeedMode": "zombie-swiper",
+    "blockOfferPatterns": ["signup_bonus", "withdraw"],
+    "color": "#84cc16",
+    "pollSeconds": 90,
+    "limit": 40
+  },
+  {
+    "id": "mistcoins",
+    "name": "MistCoins",
+    "enabled": true,
+    "type": "public-live-feed",
+    "url": "https://mistcoins.com/",
+    "publicFeedMode": "mistcoins",
+    "color": "#f97316",
+    "pollSeconds": 75,
+    "limit": 40
+  },
+  {
     "id": "earng",
     "name": "EarnG",
     "enabled": true,
