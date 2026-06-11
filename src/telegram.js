@@ -13,17 +13,9 @@ const sourceFilter = new Set(
     .filter(Boolean)
 );
 const commandsEnabled = process.env.TELEGRAM_BOT_COMMANDS !== "false";
-const autoTopPinEnabled =
-  process.env.TELEGRAM_AUTO_TOP_PIN !== "false" &&
-  process.env.TELEGRAM_DAILY_TOP_PIN !== "false";
-const autoTopPinIntervalMs =
-  Math.max(
-    1,
-    Number(process.env.TELEGRAM_AUTO_TOP_PIN_HOURS || process.env.TELEGRAM_DAILY_TOP_PIN_HOURS || 1)
-  ) *
-  60 *
-  60 *
-  1000;
+const autoTopPinEnabled = process.env.TELEGRAM_AUTO_TOP_PIN !== "false";
+const dailyTopPinEnabled = process.env.TELEGRAM_DAILY_TOP_PIN !== "false";
+const dailyTopPinTime = String(process.env.TELEGRAM_DAILY_TOP_PIN_TIME || "00:00");
 const topCoinsPinLimit = Math.min(
   40,
   Math.max(5, Number(process.env.TELEGRAM_TOPCOINS_PIN_LIMIT || 30))
@@ -45,6 +37,7 @@ const blockedOfferPatterns = String(
 let updateOffset = 0;
 let botStarted = false;
 let autoTopPinStarted = false;
+let dailyTopPinStarted = false;
 let alertQueueRunning = false;
 
 /** @type {{ text: string, targetChatId: string }[]} */
@@ -87,6 +80,10 @@ function formatEventTime(event) {
           ? `${Math.floor(seconds / 3600)}h ago`
           : `${Math.floor(seconds / 86400)}d ago`;
   return `${relative} (${new Date(time).toLocaleString("en-US", { timeZone: "Asia/Dhaka" })} BDT)`;
+}
+
+function formatLeadTime(at) {
+  return at ? formatEventTime({ at }) : "unknown";
 }
 
 function isAllowedChat(id) {
@@ -354,7 +351,10 @@ function formatTopOffers(data, sources = []) {
       const rows = (block.byCoins || block.byFrequency || [])
         .filter(passesTelegramOfferFilter)
         .slice(0, 5)
-        .map((offer) => `#${offer.rank} ${escapeHtml(offer.offer)} — ${escapeHtml(offer.maxRawAmount || `${offer.maxAmount}`)}`)
+        .map(
+          (offer) =>
+            `#${offer.rank} ${escapeHtml(offer.offer)} — ${escapeHtml(offer.maxRawAmount || `${offer.maxAmount}`)}\n${field("Last lead:", formatLeadTime(offer.latestAt), "⏱️")}`
+        )
         .join("\n");
       return `${divider}\n<b>${escapeHtml(names.get(sourceId) || sourceId)}</b>\n${rows || "No rows"}`;
     })
@@ -383,13 +383,13 @@ function formatTopCoins(data, sources = [], limit = 15) {
     divider,
     ...rows.map(
       (offer, index) =>
-        `#${index + 1} <b>${escapeHtml(offer.sourceName)}</b>\n${field("Offer:", offer.offer, "🎯")}\n${field("Reward:", offer.maxRawAmount || `${offer.maxAmount}`, "💰")}`
+        `#${index + 1} <b>${escapeHtml(offer.sourceName)}</b>\n${field("Offer:", offer.offer, "🎯")}\n${field("Reward:", offer.maxRawAmount || `${offer.maxAmount}`, "💰")}\n${field("Last lead:", formatLeadTime(offer.latestAt), "⏱️")}`
     ),
     divider,
   ].join("\n");
 }
 
-function formatAutoTopReport(data, sources = []) {
+function formatAutoTopReport(data, sources = [], title = "📌 HOURLY TOP REPORT") {
   const names = sourceNameMap(sources);
   const sourceRows = Object.entries(data.bySource || {});
   const byFrequency = sourceRows
@@ -421,7 +421,7 @@ function formatAutoTopReport(data, sources = []) {
     ? byFrequency
         .map(
           (offer, index) =>
-            `#${index + 1} <b>${escapeHtml(offer.sourceName)}</b>\n${field("Offer:", offer.offer, "🎯")}\n${field("Hits:", `${offer.count}x`, "🔁")}`
+            `#${index + 1} <b>${escapeHtml(offer.sourceName)}</b>\n${field("Offer:", offer.offer, "🎯")}\n${field("Hits:", `${offer.count}x`, "🔁")}\n${field("Last lead:", formatLeadTime(offer.latestAt), "⏱️")}`
         )
         .join("\n")
     : "No rows";
@@ -429,15 +429,16 @@ function formatAutoTopReport(data, sources = []) {
     ? byCoins
         .map(
           (offer, index) =>
-            `#${index + 1} <b>${escapeHtml(offer.sourceName)}</b>\n${field("Offer:", offer.offer, "🎯")}\n${field("Reward:", offer.maxRawAmount || `${offer.maxAmount}`, "💰")}`
+            `#${index + 1} <b>${escapeHtml(offer.sourceName)}</b>\n${field("Offer:", offer.offer, "🎯")}\n${field("Reward:", offer.maxRawAmount || `${offer.maxAmount}`, "💰")}\n${field("Last lead:", formatLeadTime(offer.latestAt), "⏱️")}`
         )
         .join("\n")
     : "No rows";
 
   return [
-    "<b>📌 HOURLY TOP REPORT</b>",
+    `<b>${title}</b>`,
     field("Day:", data.day || "today", "📅"),
     field("Timezone:", "BDT", "⏰"),
+    field("Generated:", new Date().toLocaleString("en-US", { timeZone: "Asia/Dhaka" }), "🕒"),
     divider,
     "<b>🏆 TOP OFFERS - MOST COMPLETED</b>",
     frequencyRows,
@@ -473,16 +474,49 @@ function formatSearchResults(events, query) {
   return `<b>🔎 SEARCH RESULTS</b>\n${field("Query:", query, "⌨️")}\n${rows.map(eventLine).join("\n")}`;
 }
 
-async function sendAndPinTopReport(handlers, target = chatId) {
+async function sendAndPinTopReport(handlers, target = chatId, title = "📌 HOURLY TOP REPORT") {
   const sources = handlers.getSources();
   const text = formatAutoTopReport(
     handlers.getDailyTopOffers({ source: "all", limit: topCoinsPinLimit }),
-    sources
+    sources,
+    title
   );
   if (text.startsWith("No top offers")) return false;
   const message = await sendTelegramMessage(text, target);
   await pinTelegramMessage(message?.message_id, target);
   return true;
+}
+
+function msUntilNextHour() {
+  const now = new Date();
+  const elapsed = now.getMinutes() * 60_000 + now.getSeconds() * 1000 + now.getMilliseconds();
+  return Math.max(1000, 3_600_000 - elapsed);
+}
+
+function dhakaClockParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Dhaka",
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(date);
+  const get = (type) => Number(parts.find((part) => part.type === type)?.value || 0);
+  return { hour: get("hour") % 24, minute: get("minute"), second: get("second") };
+}
+
+function msUntilNextDhakaTime(value) {
+  const [targetHourRaw, targetMinuteRaw] = String(value || "00:00").split(":");
+  const targetHour = Math.min(23, Math.max(0, Number(targetHourRaw) || 0));
+  const targetMinute = Math.min(59, Math.max(0, Number(targetMinuteRaw) || 0));
+  const now = new Date();
+  const current = dhakaClockParts(now);
+  const currentMinutes = current.hour * 60 + current.minute;
+  const targetMinutes = targetHour * 60 + targetMinute;
+  let diffMinutes = targetMinutes - currentMinutes;
+  if (diffMinutes <= 0) diffMinutes += 24 * 60;
+  const elapsedCurrentMinute = current.second * 1000 + now.getMilliseconds();
+  return Math.max(1000, diffMinutes * 60_000 - elapsedCurrentMinute);
 }
 
 function startAutoTopPin(handlers) {
@@ -498,11 +532,41 @@ function startAutoTopPin(handlers) {
     }
   };
 
-  setTimeout(() => {
-    run();
-    setInterval(run, autoTopPinIntervalMs);
-  }, autoTopPinIntervalMs);
-  console.log(`[telegram] hourly top report pin every ${Math.round(autoTopPinIntervalMs / 3600000)}h`);
+  const schedule = () => {
+    const delay = msUntilNextHour();
+    setTimeout(() => {
+      run();
+      schedule();
+    }, delay);
+  };
+
+  schedule();
+  console.log("[telegram] hourly top report pin on each clock hour");
+}
+
+function startDailyTopPin(handlers) {
+  if (!dailyTopPinEnabled || dailyTopPinStarted) return;
+  dailyTopPinStarted = true;
+
+  const run = async () => {
+    try {
+      const pinned = await sendAndPinTopReport(handlers, chatId, "📅 DAILY TOP REPORT");
+      console.log(`[telegram] daily top report pin ${pinned ? "sent" : "skipped"}`);
+    } catch (err) {
+      console.warn(`[telegram] daily top report pin failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
+  const schedule = () => {
+    const delay = msUntilNextDhakaTime(dailyTopPinTime);
+    setTimeout(() => {
+      run();
+      schedule();
+    }, delay);
+  };
+
+  schedule();
+  console.log(`[telegram] daily top report pin at ${dailyTopPinTime} BDT`);
 }
 
 async function getUpdates() {
@@ -635,5 +699,6 @@ export function startTelegramBot(handlers) {
 
   loop();
   startAutoTopPin(handlers);
+  startDailyTopPin(handlers);
   console.log("[telegram] bot commands enabled");
 }

@@ -321,11 +321,23 @@ export function getEventsPaginated(opts = {}) {
 /** @type {string} */
 let impressionDay = "";
 
-/** @type {Map<string, Map<string, { offer: string, count: number, maxAmount: number, maxRawAmount: string, unit: string }>>} */
+/** @type {Map<string, Map<string, { offer: string, count: number, maxAmount: number, maxRawAmount: string, unit: string, latestAt: string }>>} */
 const dailyOfferCounts = new Map();
 
 function todayKey() {
-  return new Date().toISOString().slice(0, 10);
+  return dayKeyForAt(new Date().toISOString());
+}
+
+function dayKeyForAt(value) {
+  const date = new Date(value || Date.now());
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Dhaka",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(Number.isFinite(date.getTime()) ? date : new Date());
+  const get = (type) => parts.find((part) => part.type === type)?.value || "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
 function resetDailyIfNeeded() {
@@ -339,7 +351,7 @@ function rebuildDailyFromOrdered() {
   resetDailyIfNeeded();
   dailyOfferCounts.clear();
   for (const event of ordered) {
-    if (String(event.at || "").slice(0, 10) === impressionDay) {
+    if (dayKeyForAt(event.at) === impressionDay) {
       recordDailyImpressions(event.source, [event]);
     }
   }
@@ -372,9 +384,13 @@ export function recordDailyImpressions(sourceId, events) {
         : amount > 0
           ? `${amount} ${unit}`
           : "";
+    const at = typeof ev === "object" && ev?.at ? String(ev.at) : new Date().toISOString();
     const row = bucket.get(key);
     if (row) {
       row.count += 1;
+      if (new Date(at).getTime() > new Date(row.latestAt || 0).getTime()) {
+        row.latestAt = at;
+      }
       if (amount > row.maxAmount) {
         row.maxAmount = amount;
         row.maxRawAmount = rawAmount || row.maxRawAmount;
@@ -387,6 +403,7 @@ export function recordDailyImpressions(sourceId, events) {
         maxAmount: amount,
         maxRawAmount: rawAmount,
         unit,
+        latestAt: at,
       });
     }
   }
@@ -400,7 +417,7 @@ export function getDailyTopOffers(opts = {}) {
   const limit = Math.min(15, Math.max(1, Number(opts.limit) || 8));
   const filterSource = opts.source && opts.source !== "all" ? opts.source : null;
 
-  /** @type {Record<string, { source: string, byFrequency: { offer: string, count: number, maxAmount: number, maxRawAmount: string, rank: number }[], byCoins: { offer: string, count: number, maxAmount: number, maxRawAmount: string, rank: number }[] }>} */
+  /** @type {Record<string, { source: string, byFrequency: { offer: string, count: number, maxAmount: number, maxRawAmount: string, latestAt: string, rank: number }[], byCoins: { offer: string, count: number, maxAmount: number, maxRawAmount: string, latestAt: string, rank: number }[] }>} */
   const bySource = {};
 
   for (const [sourceId, bucket] of dailyOfferCounts) {
@@ -411,6 +428,7 @@ export function getDailyTopOffers(opts = {}) {
       count: row.count,
       maxAmount: row.maxAmount,
       maxRawAmount: row.maxRawAmount || `${row.maxAmount} ${row.unit}`,
+      latestAt: row.latestAt,
       rank,
     });
     const byFrequency = rows
@@ -491,7 +509,7 @@ export function hydrateStoreState(state) {
   const rawDaily = state.dailyOfferCounts;
   if (rawDaily && typeof rawDaily === "object") {
     for (const [sourceId, bucketRaw] of Object.entries(rawDaily)) {
-      /** @type {Map<string, { offer: string, count: number, maxAmount: number, maxRawAmount: string, unit: string }>} */
+      /** @type {Map<string, { offer: string, count: number, maxAmount: number, maxRawAmount: string, unit: string, latestAt: string }>} */
       const bucket = new Map();
       if (Array.isArray(bucketRaw)) {
         for (const entry of bucketRaw) {
@@ -504,6 +522,7 @@ export function hydrateStoreState(state) {
             maxAmount: Number(row.maxAmount) || 0,
             maxRawAmount: String(row.maxRawAmount || ""),
             unit: String(row.unit || "coins"),
+            latestAt: String(row.latestAt || state.savedAt || new Date().toISOString()),
           });
         }
       }
@@ -513,14 +532,14 @@ export function hydrateStoreState(state) {
   resetDailyIfNeeded();
   dailyOfferCounts.clear();
   for (const event of ordered) {
-    if (String(event.at || "").slice(0, 10) === impressionDay) {
+    if (dayKeyForAt(event.at) === impressionDay) {
       recordDailyImpressions(event.source, [event]);
     }
   }
 }
 
 export function exportStoreState() {
-  /** @type {Record<string, [string, { offer: string, count: number, maxAmount: number, maxRawAmount: string, unit: string }][]>} */
+  /** @type {Record<string, [string, { offer: string, count: number, maxAmount: number, maxRawAmount: string, unit: string, latestAt: string }][]>} */
   const dailyOfferCountsOut = {};
   for (const [sourceId, bucket] of dailyOfferCounts) {
     dailyOfferCountsOut[sourceId] = [...bucket.entries()];
