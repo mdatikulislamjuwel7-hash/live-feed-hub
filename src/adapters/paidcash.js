@@ -16,6 +16,10 @@ export async function fetchPaidcash(source) {
     return await fetchPaidcashSocket(source);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    if (/no earn feed rows|socket rows missing live leads|rows missing live leads/i.test(msg)) {
+      console.warn(`[paidcash] transient empty socket poll: ${msg}`);
+      return [];
+    }
     if (
       source.useBrowserFallback === false ||
       String(process.env.PUPPETEER_SKIP_DOWNLOAD || "").toLowerCase() === "true"
@@ -37,7 +41,10 @@ async function fetchPaidcashSocket(source) {
   );
   const events = buildEvents(source, rows, profiles);
   const named = events.filter((e) => e.offerName);
-  if (!events.length) throw new Error("socket rows missing live leads");
+  if (!events.length) {
+    console.warn("[paidcash] socket rows missing usable live leads");
+    return [];
+  }
   if (!named.length) {
     console.warn("[paidcash] socket rows missing offer names");
   }
