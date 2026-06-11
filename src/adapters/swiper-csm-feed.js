@@ -61,6 +61,70 @@ function tooltipHtml(el) {
   );
 }
 
+function parseMarkdownFeed(text, source) {
+  const feedType = String(source.feedType || "offer");
+  const lines = String(text || "")
+    .split(/\r?\n/)
+    .map(cleanText)
+    .filter(Boolean);
+  /** @type {import('../types.js').FeedEvent[]} */
+  const events = [];
+  const seen = new Set();
+
+  for (let i = 0; i < lines.length - 3; i++) {
+    if (/^(hot offers|offerwalls|survey)$/i.test(lines[i])) break;
+    if (!/^!\[Image\b/i.test(lines[i])) continue;
+
+    const user = lines[i + 1];
+    const wall = lines[i + 2];
+    const amountText = lines[i + 3];
+    if (!user || !wall || !amountText) continue;
+    if (/^(view offers|start offer|cashout)$/i.test(user)) continue;
+    if (!/^-?\$?[\d,.]+(?:\s*(?:coins|points|pts))?$/i.test(amountText)) continue;
+    if (feedType !== "all" && wall.toLowerCase() === "cashout") continue;
+
+    const amount = amountFrom(amountText);
+    const unit = amountText.includes("$") ? "USD" : "coins";
+    const offerName = wall.toLowerCase() === "cashout" ? "Cashout" : `${wall} live offer`;
+    const key = `${user}|${wall}|${amountText}|proxy`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const id = crypto.createHash("sha256").update(`${source.id}|${key}`).digest("hex").slice(0, 24);
+    events.push({
+      id: `${source.id}-${id}`,
+      source: String(source.id),
+      sourceName: String(source.name),
+      user,
+      offer: `${wall} → ${offerName}`,
+      offerwall: wall,
+      offerName,
+      country: null,
+      isPrivate: false,
+      amount,
+      unit,
+      rawAmount: unit === "USD" ? amountText : `${amountText} coins`,
+      at: new Date().toISOString(),
+    });
+  }
+
+  return events.slice(0, Number(source.limit) || 40);
+}
+
+async function fetchProxyMarkdown(source) {
+  const url = String(source.proxyUrl || source.url || "https://www.earnlycash.com/earn");
+  const proxyUrl = `https://r.jina.ai/http://r.jina.ai/http://${url}`;
+  const res = await fetch(proxyUrl, {
+    headers: {
+      Accept: "text/plain",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) LiveFeedHub/1.0",
+    },
+    signal: AbortSignal.timeout(Number(source.proxyTimeoutMs) || Number(source.timeoutMs) || 25000),
+  });
+  if (!res.ok) throw new Error(`${source.name}: proxy HTTP ${res.status}`);
+  return parseMarkdownFeed(await res.text(), source);
+}
+
 /**
  * Public homepage swiper cards (EarnlyCash-style user-List-CSM slides).
  * @param {Record<string, unknown>} source
@@ -78,7 +142,13 @@ export async function fetchSwiperCsmFeed(source) {
     },
     signal: AbortSignal.timeout(Number(source.timeoutMs) || 25000),
   });
-  if (!res.ok) throw new Error(`${source.name}: HTTP ${res.status}`);
+  if (!res.ok) {
+    if (res.status === 403 && source.proxyFallback !== false) {
+      const events = await fetchProxyMarkdown(source);
+      if (events.length) return events;
+    }
+    throw new Error(`${source.name}: HTTP ${res.status}`);
+  }
 
   const $ = cheerio.load(await res.text());
   const feedType = String(source.feedType || "offer");
