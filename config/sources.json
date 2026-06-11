@@ -51,17 +51,6 @@
     "pollSeconds": 45
   },
   {
-    "id": "earnlab",
-    "name": "EarnLab",
-    "enabled": true,
-    "type": "json-feed",
-    "schema": "earnlab",
-    "url": "https://api.earnlab.com/activities",
-    "referer": "https://earnlab.com/",
-    "color": "#22c55e",
-    "pollSeconds": 45
-  },
-  {
     "id": "lootgain",
     "name": "LootGain",
     "enabled": true,
@@ -137,17 +126,6 @@
     "color": "#22c55e",
     "pollSeconds": 120,
     "limit": 30
-  },
-  {
-    "id": "earnfino",
-    "name": "Earnfino",
-    "enabled": true,
-    "type": "earnfino-leaderboard",
-    "url": "https://earnfino.com/api/leaderboard",
-    "referer": "https://earnfino.com/leaderboard",
-    "color": "#06b6d4",
-    "pollSeconds": 60,
-    "limit": 40
   },
   {
     "id": "boostlyearn",
