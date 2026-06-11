@@ -22,6 +22,7 @@ const topCoinsPinLimit = Math.min(
 );
 const highCoinAmount = Number(process.env.TELEGRAM_HIGH_COIN_AMOUNT || 1000);
 const highUsdAmount = Number(process.env.TELEGRAM_HIGH_USD_AMOUNT || 10);
+const divider = "━━━━━━━━━━━━━━━━";
 
 let updateOffset = 0;
 let botStarted = false;
@@ -42,6 +43,10 @@ function amount(event) {
   if (event.rawAmount) return event.rawAmount;
   if (event.unit === "USD") return `$${Number(event.amount || 0).toFixed(2)}`;
   return `${event.amount} ${event.unit || "points"}`;
+}
+
+function field(label, value) {
+  return `<b>${label}</b> ${escapeHtml(value || "-")}`;
 }
 
 function formatEventTime(event) {
@@ -80,13 +85,24 @@ function eventLine(event) {
   const wall = event.offerwall || event.sourceName || "Source";
   const user = event.user ? `@${event.user}` : "unknown user";
   return [
-    `<b>Website:</b> ${escapeHtml(event.sourceName || event.source)}`,
-    `<b>Offer:</b> ${escapeHtml(name)}`,
-    `<b>Offerwall:</b> ${escapeHtml(wall)}`,
-    `<b>Reward:</b> ${escapeHtml(amount(event))}`,
-    `<b>User:</b> ${escapeHtml(user)}`,
-    `<b>Lead time:</b> ${escapeHtml(formatEventTime(event))}`,
+    divider,
+    field("Website", event.sourceName || event.source),
+    field("Offer", name),
+    field("Network", wall),
+    field("Reward", amount(event)),
+    field("User", user),
+    field("Completed", formatEventTime(event)),
+    divider,
   ].join("\n");
+}
+
+function cleanHealthError(message) {
+  const text = String(message || "Unknown error");
+  if (text.includes("Could not find Chrome")) {
+    return "Browser fallback is unavailable on Railway. PaidCash socket/API will retry automatically.";
+  }
+  if (text.length <= 260) return text;
+  return `${text.slice(0, 257)}...`;
 }
 
 export async function sendTelegramMessage(text, targetChatId = chatId, extra = {}) {
@@ -137,8 +153,8 @@ export async function notifyTelegram(events) {
   const filtered = events.filter(shouldAlert);
   if (!filtered.length) return;
   for (const event of filtered) {
-    const title = isHighValue(event) ? "High Coin Alert" : "Live Feed Hub";
-    await sendTelegramMessage(`<b>${title}</b>\nNew live lead\n\n${eventLine(event)}`);
+    const title = isHighValue(event) ? "HIGH VALUE LIVE LEAD" : "NEW LIVE LEAD";
+    await sendTelegramMessage(`<b>${title}</b>\n${eventLine(event)}`);
   }
 }
 
@@ -150,15 +166,23 @@ export async function notifySourceHealthChange(source, health, previousHealth) {
   if (status === "error") {
     await sendTelegramMessage(
       [
-        "<b>Source Error</b>",
-        "",
-        `<b>${escapeHtml(source?.name || source?.id || "Source")}</b> is failing.`,
-        escapeHtml(String(health?.lastError || "Unknown error")).slice(0, 700),
+        "<b>SOURCE CHECK</b>",
+        divider,
+        field("Website", source?.name || source?.id || "Source"),
+        field("Status", "Needs attention"),
+        field("Details", cleanHealthError(health?.lastError)),
+        divider,
       ].join("\n")
     );
   } else if (status === "ok" && previousStatus === "error") {
     await sendTelegramMessage(
-      `<b>Source Recovered</b>\n\n<b>${escapeHtml(source?.name || source?.id || "Source")}</b> is working again.`
+      [
+        "<b>SOURCE RECOVERED</b>",
+        divider,
+        field("Website", source?.name || source?.id || "Source"),
+        field("Status", "Working again"),
+        divider,
+      ].join("\n")
     );
   }
 }
@@ -169,34 +193,35 @@ export function telegramStatus() {
 
 function helpText() {
   return [
-    "<b>Live Feed Hub Bot</b>",
-    "",
-    "/status - server summary",
-    "/sources - source health",
-    "/sites - clickable site feed menu",
-    "/feed - latest all sites",
-    "/feed apucash - latest from one source",
-    "/top - daily top offers",
-    "/top apucash - top offers for one source",
-    "/topcoins - highest coin offers today",
-    "/search binance - search feed history",
+    "<b>LIVE FEED HUB BOT</b>",
+    divider,
+    field("/status", "server summary"),
+    field("/sources", "source health"),
+    field("/sites", "clickable site feed menu"),
+    field("/feed", "latest all sites"),
+    field("/feed apucash", "latest from one source"),
+    field("/top", "daily top offers"),
+    field("/topcoins", "highest coin offers today"),
+    field("/search binance", "search feed history"),
+    divider,
   ].join("\n");
 }
 
 function formatFeed(events, title = "Latest Feed") {
   if (!events.length) return "No feed rows yet.";
-  return `<b>${escapeHtml(title)}</b>\n\n${events.slice(0, 10).map(eventLine).join("\n\n")}`;
+  return `<b>${escapeHtml(title.toUpperCase())}</b>\n${events.slice(0, 10).map(eventLine).join("\n")}`;
 }
 
 function formatSources(sources) {
-  return sources
+  const rows = sources
     .slice(0, 40)
     .map((source) => {
       const health = source.health || {};
-      const icon = health.status === "ok" ? "✅" : health.status === "error" ? "❌" : "⏳";
-      return `${icon} <b>${escapeHtml(source.name)}</b> — ${escapeHtml(health.status || "pending")} (${health.count || 0})`;
+      const status = health.status === "ok" ? "OK" : health.status === "error" ? "ERROR" : "SYNCING";
+      return `<b>${escapeHtml(source.name)}</b> | ${escapeHtml(status)} | ${escapeHtml(health.count || 0)} rows`;
     })
     .join("\n");
+  return `<b>SOURCE HEALTH</b>\n${divider}\n${rows}\n${divider}`;
 }
 
 function sourceNameMap(sources) {
@@ -237,16 +262,17 @@ function formatTopOffers(data, sources = []) {
   const names = sourceNameMap(sources);
   const blocks = Object.entries(data.bySource || {});
   if (!blocks.length) return "No top offers yet today.";
-  return blocks
+  const rows = blocks
     .slice(0, 8)
     .map(([sourceId, block]) => {
       const rows = (block.byCoins || block.byFrequency || [])
         .slice(0, 5)
         .map((offer) => `#${offer.rank} ${escapeHtml(offer.offer)} — ${escapeHtml(offer.maxRawAmount || `${offer.maxAmount}`)}`)
         .join("\n");
-      return `<b>${escapeHtml(names.get(sourceId) || sourceId)}</b>\n${rows || "No rows"}`;
+      return `${divider}\n<b>${escapeHtml(names.get(sourceId) || sourceId)}</b>\n${rows || "No rows"}`;
     })
     .join("\n\n");
+  return `<b>DAILY TOP OFFERS</b>\n${rows}\n${divider}`;
 }
 
 function formatTopCoins(data, sources = [], limit = 15) {
@@ -264,12 +290,14 @@ function formatTopCoins(data, sources = [], limit = 15) {
 
   if (!rows.length) return "No high coin offers recorded yet today.";
   return [
-    `<b>Highest Coin Offers (${escapeHtml(data.day || "today")})</b>`,
-    "",
+    `<b>HIGHEST COIN OFFERS</b>`,
+    field("Day", data.day || "today"),
+    divider,
     ...rows.map(
       (offer, index) =>
-        `#${index + 1} <b>${escapeHtml(offer.sourceName)}</b>\n${escapeHtml(offer.offer)} — ${escapeHtml(offer.maxRawAmount || `${offer.maxAmount}`)}`
+        `#${index + 1} <b>${escapeHtml(offer.sourceName)}</b>\n${field("Offer", offer.offer)}\n${field("Reward", offer.maxRawAmount || `${offer.maxAmount}`)}`
     ),
+    divider,
   ].join("\n");
 }
 
@@ -294,7 +322,7 @@ function formatSearchResults(events, query) {
     })
     .slice(0, 10);
   if (!rows.length) return `No history found for: ${escapeHtml(query)}`;
-  return `<b>Search: ${escapeHtml(query)}</b>\n\n${rows.map(eventLine).join("\n\n")}`;
+  return `<b>SEARCH RESULTS</b>\n${field("Query", query)}\n${rows.map(eventLine).join("\n")}`;
 }
 
 async function sendAndPinTopCoins(handlers, target = chatId) {
@@ -416,7 +444,7 @@ export function startTelegramBot(handlers) {
           } else if (cmd === "/sources") {
             await sendTelegramMessage(formatSources(handlers.getSources()), target);
           } else if (cmd === "/sites") {
-            await sendTelegramMessage("<b>Select a site feed</b>", target, {
+            await sendTelegramMessage(`<b>SELECT WEBSITE</b>\n${divider}`, target, {
               reply_markup: sourceButtons(sources, "feed"),
             });
           } else if (cmd === "/feed") {

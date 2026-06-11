@@ -16,6 +16,12 @@ export async function fetchPaidcash(source) {
     return await fetchPaidcashSocket(source);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    if (
+      source.useBrowserFallback === false ||
+      String(process.env.PUPPETEER_SKIP_DOWNLOAD || "").toLowerCase() === "true"
+    ) {
+      throw new Error(`PaidCash socket/API unavailable: ${msg}`);
+    }
     console.warn(`[paidcash] socket failed (${msg}), browser fallback`);
     return withBrowserLock(() => fetchPaidcashBrowser(source));
   }
@@ -31,7 +37,10 @@ async function fetchPaidcashSocket(source) {
   );
   const events = buildEvents(source, rows, profiles);
   const named = events.filter((e) => e.offerName);
-  if (!named.length) throw new Error("socket rows missing offername");
+  if (!events.length) throw new Error("socket rows missing live leads");
+  if (!named.length) {
+    console.warn("[paidcash] socket rows missing offer names");
+  }
   return events;
 }
 
