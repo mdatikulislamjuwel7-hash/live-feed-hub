@@ -30,10 +30,11 @@ function relativeToIso(text) {
   const value = String(text || "").toLowerCase();
   const now = Date.now();
   if (!value || value.includes("just now")) return new Date(now).toISOString();
-  const match = value.match(/(\d+)\s*(minute|hour|day|week|month|year)s?\s+ago/);
+  const match = value.match(/(\d+)\s*(second|minute|hour|day|week|month|year)s?\s+ago/);
   if (!match) return new Date(now).toISOString();
   const amount = Number(match[1]);
   const multipliers = {
+    second: 1000,
     minute: 60_000,
     hour: 3_600_000,
     day: 86_400_000,
@@ -208,7 +209,13 @@ function parseLiveLeads(leads, source) {
     const user = String(lead.user || "anonymous");
     const isCashout = Boolean(lead.is_cashout);
     const offerwall = isCashout ? "Cashout" : String(lead.provider || "Offer");
-    const offerName = String(lead.offer_name || "Offer");
+    const offerName = String(
+      lead.offer_name ||
+        lead.offer ||
+        lead.title ||
+        lead.name ||
+        (isCashout ? "Withdrawal" : "Offer")
+    );
     const reward = asNumber(lead.reward);
     const created = lead.created_at;
     let at = new Date().toISOString();
@@ -218,13 +225,7 @@ function parseLiveLeads(leads, source) {
       at = new Date(lead.timestamp * 1000).toISOString();
     }
 
-    const id = hashId(String(source.id), [
-      String(lead.id || user),
-      offerwall,
-      offerName,
-      reward,
-      at,
-    ]);
+    const id = hashId(String(source.id), [String(lead.id || user), offerwall, offerName, reward, at]);
 
     return {
       id: `${source.id}-${id}`,
@@ -271,7 +272,8 @@ function parseLiveCashoutCards(html, source) {
     const amountText = tooltip.Amount || "";
     const amount = asNumber(amountText);
     const timeText =
-      text.match(/(?:just now|\d+\s+(?:minute|hour|day|week|month|year)s?\s+ago)/i)?.[0] || "";
+      text.match(/(?:just now|\d+\s+(?:second|minute|hour|day|week|month|year)s?\s+ago)/i)?.[0] || "";
+    const at = relativeToIso(timeText);
 
     let offerwall = "Offer";
     let offerName = "Live reward";
@@ -297,7 +299,7 @@ function parseLiveCashoutCards(html, source) {
     if (seen.has(semantic)) return;
     seen.add(semantic);
 
-    const id = hashId(String(source.id), [user, offerwall, offerName, amount]);
+    const id = hashId(String(source.id), [user, offerwall, offerName, amount, timeText || at.slice(0, 10)]);
     events.push({
       id: `${source.id}-${id}`,
       source: String(source.id),
@@ -311,7 +313,7 @@ function parseLiveCashoutCards(html, source) {
       amount,
       unit: amountText.includes("$") ? "USD" : "points",
       rawAmount: amountText || `${amount.toLocaleString()} points`,
-      at: relativeToIso(timeText),
+      at,
     });
   });
 

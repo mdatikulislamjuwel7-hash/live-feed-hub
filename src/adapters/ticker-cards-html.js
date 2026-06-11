@@ -21,6 +21,26 @@ function tooltipValue(text, label) {
   return cleanText(text.match(pattern)?.[1] || "");
 }
 
+function relativeToIso(text) {
+  const value = String(text || "").toLowerCase();
+  const now = Date.now();
+  if (!value || value.includes("just now")) return new Date(now).toISOString();
+  const match = value.match(/(\d+)\s*(second|minute|hour|day|week|month|year)s?\s+ago/);
+  if (!match) return new Date(now).toISOString();
+  const amount = Number(match[1]);
+  const multipliers = {
+    second: 1000,
+    minute: 60_000,
+    hour: 3_600_000,
+    day: 86_400_000,
+    week: 604_800_000,
+    month: 2_592_000_000,
+    year: 31_536_000_000,
+  };
+  const unit = /** @type {keyof typeof multipliers} */ (match[2]);
+  return new Date(now - amount * multipliers[unit]).toISOString();
+}
+
 function splitOfferName(value, fallbackWall) {
   const text = cleanText(value);
   if (!text) return null;
@@ -42,6 +62,9 @@ function attrOfferDetails($, el, fallbackWall) {
   const candidates = [
     el.attr("data-bs-original-title"),
     el.attr("data-original-title"),
+    el.attr("data-tippy-content"),
+    el.attr("data-tooltip"),
+    el.attr("data-content"),
     el.attr("data-title"),
     el.attr("aria-label"),
     el.attr("title"),
@@ -52,6 +75,8 @@ function attrOfferDetails($, el, fallbackWall) {
     const named =
       tooltipValue(text, "Offer Name") ||
       tooltipValue(text, "Offername") ||
+      tooltipValue(text, "Offer Title") ||
+      tooltipValue(text, "Title") ||
       tooltipValue(text, "Name") ||
       tooltipValue(text, "Offer");
     const wall = tooltipValue(text, "Offerwall") || fallbackWall;
@@ -109,7 +134,11 @@ export async function fetchTickerCardsHtml(source) {
     const details = attrOfferDetails($, el, offerwall);
     if (details?.offerwall) offerwall = details.offerwall;
     const offerName = details?.offerName || (isWithdraw ? `${offerwall} withdrawal` : `${offerwall} reward`);
-    const key = `${user}|${offerwall}|${amountText}|${isWithdraw ? "w" : "o"}`;
+    const timeText = cleanText(
+      el.text().match(/(?:just now|\d+\s+(?:second|minute|hour|day|week|month|year)s?\s+ago)/i)?.[0] || ""
+    );
+    const at = relativeToIso(timeText);
+    const key = `${user}|${offerwall}|${offerName}|${amountText}|${timeText || "live"}|${isWithdraw ? "w" : "o"}`;
     if (seen.has(key)) return;
     seen.add(key);
 
@@ -127,7 +156,7 @@ export async function fetchTickerCardsHtml(source) {
       amount,
       unit: "coins",
       rawAmount: amountText ? `${amountText} coins` : `${amount} coins`,
-      at: new Date().toISOString(),
+      at,
     });
   });
 

@@ -3,13 +3,22 @@ import crypto from "crypto";
 import { getDailyTaskLabel } from "./apucash-daily-tasks.js";
 import { matchActivity } from "./apucash-profiles.js";
 
+function cleanText(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function tooltipValue(text, label) {
+  const pattern = new RegExp(`${label}\\s*[:\\-]\\s*([^|\\n]+)`, "i");
+  return cleanText(text.match(pattern)?.[1] || "");
+}
+
 /**
  * @param {import('cheerio').CheerioAPI} $
  * @param {import('cheerio').Cheerio<import('cheerio').Element>} block
  */
 export function extractOfferDetail($, block) {
   const header = block.find(".offer_stat-header").first();
-  const smallLine = header.find("p[style*='10px']").first().text().trim();
+  const smallLine = cleanText(header.find("p[style*='10px']").first().text());
 
   let offerImageAlt = "";
   header.find("img").each((_, img) => {
@@ -21,6 +30,29 @@ export function extractOfferDetail($, block) {
     }
   });
 
+  const attrText = [
+    block.attr("data-bs-original-title"),
+    block.attr("data-original-title"),
+    block.attr("data-tippy-content"),
+    block.attr("data-tooltip"),
+    block.attr("title"),
+    header.attr("data-bs-original-title"),
+    header.attr("data-original-title"),
+    header.attr("data-tippy-content"),
+    header.attr("data-tooltip"),
+    header.attr("title"),
+  ]
+    .map((value) => cleanText(cheerio.load(String(value || "")).text() || value))
+    .filter(Boolean)
+    .join(" | ");
+  const attrName =
+    tooltipValue(attrText, "Offer Name") ||
+    tooltipValue(attrText, "Offername") ||
+    tooltipValue(attrText, "Title") ||
+    tooltipValue(attrText, "Name") ||
+    tooltipValue(attrText, "Offer");
+
+  if (attrName) return { offerName: attrName, source: "tooltip" };
   if (smallLine) return { offerName: smallLine, source: "ticker" };
   if (offerImageAlt) return { offerName: offerImageAlt, source: "image" };
   return { offerName: "", source: "" };

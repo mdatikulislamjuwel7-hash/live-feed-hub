@@ -18,6 +18,14 @@ function truncate(text, max = 120) {
   return value.length > max ? `${value.slice(0, max - 3)}...` : value;
 }
 
+function firstText(...values) {
+  for (const value of values) {
+    const text = String(value ?? "").replace(/\s+/g, " ").trim();
+    if (text) return text;
+  }
+  return "";
+}
+
 async function fetchJson(url, source) {
   const res = await fetch(url, {
     headers: {
@@ -48,8 +56,18 @@ function getRows(data) {
 function normalizePaidByte(row, source) {
   const userObj = /** @type {Record<string, unknown>} */ (row.userId ?? {});
   const username = String(userObj.username || row.username || "anonymous");
-  const offerwall = String(row.provider || row.offerwall || row.type || "Offer");
-  const offerName = String(row.offerName || row.title || row.name || "Offer").replace(`${offerwall} - `, "");
+  const offerObj = /** @type {Record<string, unknown>} */ (row.offerId ?? row.offer ?? {});
+  const offerwall = firstText(row.provider, row.offerwall, row.network, row.type, offerObj.provider, "Offer");
+  const offerName = firstText(
+    row.offerName,
+    row.offer_name,
+    row.title,
+    row.name,
+    row.description,
+    offerObj.name,
+    offerObj.title,
+    "Offer"
+  ).replace(`${offerwall} - `, "");
   const points = asNumber(row.points || row.reward || row.amount);
   const payout = asNumber(row.payout);
   const at = String(row.createdAt || row.date || row.updatedAt || new Date().toISOString());

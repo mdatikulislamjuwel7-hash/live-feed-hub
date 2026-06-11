@@ -12,7 +12,9 @@ function parseAmount(raw) {
 }
 
 function parseOffer(raw) {
-  const value = String(raw || "").replace(/<br\s*\/?>/gi, " ");
+  const value = String(raw || "")
+    .replace(/&lt;br\s*\/?&gt;/gi, " ")
+    .replace(/<br\s*\/?>/gi, " ");
   const cleaned = cheerio.load(value).root().text().replace(/\s+/g, " ").trim();
   const wall =
     cleaned.match(/^([^:]+):\s*Offername:/i)?.[1]?.trim() ||
@@ -22,10 +24,18 @@ function parseOffer(raw) {
   const name =
     cleaned.match(/offer\s*name\s*:\s*(.+?)(?:\s*\.\s*IP:|$)/i)?.[1]?.trim() ||
     cleaned.match(/Offername:\s*(.+?)(?:\s*\.\s*IP:|$)/i)?.[1]?.trim() ||
-    cleaned.replace(/\s+IP:\s*.+$/i, "").trim();
+    cleaned.match(/\bCredit:\s*(.+?)(?:\s*IP\s*:|$)/i)?.[1]?.trim() ||
+    cleaned.replace(/\s+IP\s*:\s*.+$/i, "").trim();
+  const cleanName = name
+    .replace(/&lt;[^&]+&gt;/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/^.+?\bofferwall\s+Credit:\s*/i, "")
+    .replace(/^.+?\bofferwall\s*/i, "")
+    .replace(/\s+IP\s*:\s*.+$/i, "")
+    .trim();
   return {
     offerwall: wall || "Offer",
-    offerName: name || "Offer",
+    offerName: cleanName || "Offer",
   };
 }
 

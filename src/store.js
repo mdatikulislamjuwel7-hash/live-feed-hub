@@ -26,7 +26,18 @@ function normalizeKeyPart(value) {
 
 function isGenericOfferName(value) {
   const text = normalizeKeyPart(value);
-  return text === "completed offer" || text === "offer";
+  return (
+    !text ||
+    text === "completed offer" ||
+    text === "offer" ||
+    text === "reward" ||
+    text === "live reward" ||
+    text === "featured offer" ||
+    text === "recent earner" ||
+    text === "pending / no credit yet" ||
+    /^\d+(?:\.\d+)?\s+coin reward$/.test(text) ||
+    /^[a-z0-9 ._-]+\s+reward$/.test(text)
+  );
 }
 
 /**
@@ -67,10 +78,11 @@ function mergeEvent(existing, incoming) {
   let changed = false;
   if (
     incoming.offerName &&
-    (!existing.offerName || isGenericOfferName(existing.offerName))
+    (!existing.offerName ||
+      (isGenericOfferName(existing.offerName) && !isGenericOfferName(incoming.offerName)))
   ) {
     existing.offerName = incoming.offerName;
-    existing.offer = incoming.offer;
+    if (incoming.offer) existing.offer = incoming.offer;
     changed = true;
   }
   if (!existing.country && incoming.country) {

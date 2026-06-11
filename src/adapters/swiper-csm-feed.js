@@ -13,6 +13,30 @@ function amountFrom(text) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function cleanText(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function relativeToIso(text) {
+  const value = String(text || "").toLowerCase();
+  const now = Date.now();
+  if (!value || value.includes("just now")) return new Date(now).toISOString();
+  const match = value.match(/(\d+)\s*(second|minute|hour|day|week|month|year)s?\s+ago/);
+  if (!match) return new Date(now).toISOString();
+  const amount = Number(match[1]);
+  const multipliers = {
+    second: 1000,
+    minute: 60_000,
+    hour: 3_600_000,
+    day: 86_400_000,
+    week: 604_800_000,
+    month: 2_592_000_000,
+    year: 31_536_000_000,
+  };
+  const unit = /** @type {keyof typeof multipliers} */ (match[2]);
+  return new Date(now - amount * multipliers[unit]).toISOString();
+}
+
 function parseTooltipFields(html) {
   const $ = cheerio.load(`<div>${decodeAttr(html)}</div>`);
   /** @type {Record<string, string>} */
@@ -26,6 +50,17 @@ function parseTooltipFields(html) {
   return out;
 }
 
+function tooltipHtml(el) {
+  return (
+    el.attr("data-bs-original-title") ||
+    el.attr("data-original-title") ||
+    el.attr("data-tippy-content") ||
+    el.attr("data-tooltip") ||
+    el.attr("title") ||
+    ""
+  );
+}
+
 /**
  * Public homepage swiper cards (EarnlyCash-style user-List-CSM slides).
  * @param {Record<string, unknown>} source
@@ -35,6 +70,9 @@ export async function fetchSwiperCsmFeed(source) {
   const res = await fetch(String(source.url || "https://earnlycash.com/"), {
     headers: {
       Accept: "text/html",
+      "Accept-Language": "en-US,en;q=0.9",
+      Referer: String(source.url || "https://earnlycash.com/"),
+      "Cache-Control": "no-cache",
       "User-Agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     },
@@ -54,12 +92,14 @@ export async function fetchSwiperCsmFeed(source) {
     const type = String(el.attr("data-feed-type") || "offer");
     if (feedType !== "all" && type !== feedType) return;
 
-    const user = el.find(".l_p_ti").first().text().trim() || "anonymous";
-    const offerwall = el.find(".l_p_ti_1").first().text().trim() || "Offer";
-    const amountText = el.find(".pd_amm").first().text().trim();
-    const tooltip = parseTooltipFields(el.attr("data-bs-original-title") || "");
+    const user = cleanText(el.find(".l_p_ti").first().text()) || "anonymous";
+    const offerwall = cleanText(el.find(".l_p_ti_1").first().text()) || "Offer";
+    const amountText = cleanText(el.find(".pd_amm").first().text());
+    const tooltip = parseTooltipFields(tooltipHtml(el));
     const offerName =
       tooltip.offername ||
+      tooltip["offer name"] ||
+      tooltip.title ||
       tooltip.name ||
       (type === "cashout" ? "Cashout" : offerwall);
     const wall =
@@ -71,8 +111,13 @@ export async function fetchSwiperCsmFeed(source) {
     const rawAmount = tooltip.amount || (amountText ? `${amountText} coins` : `${amount} coins`);
     const dataId = el.attr("data-id") || "";
     const userId = el.attr("data-user-id") || "";
+    const timeText =
+      tooltip.time ||
+      tooltip.date ||
+      cleanText(el.text().match(/(?:just now|\d+\s+(?:second|minute|hour|day|week|month|year)s?\s+ago)/i)?.[0] || "");
+    const at = relativeToIso(timeText);
 
-    const key = `${user}|${wall}|${offerName}|${amount}|${dataId}`;
+    const key = `${user}|${wall}|${offerName}|${amount}|${dataId}|${timeText || "live"}`;
     if (seen.has(key)) return;
     seen.add(key);
 
@@ -91,7 +136,7 @@ export async function fetchSwiperCsmFeed(source) {
       amount,
       unit,
       rawAmount,
-      at: new Date().toISOString(),
+      at,
     });
   });
 

@@ -18,6 +18,14 @@ function truncate(text, max = 120) {
   return value.length > max ? `${value.slice(0, max - 3)}...` : value;
 }
 
+function firstText(...values) {
+  for (const value of values) {
+    const text = String(value ?? "").replace(/\s+/g, " ").trim();
+    if (text) return text;
+  }
+  return "";
+}
+
 function goldtaskerRows(data) {
   return Array.isArray(data) ? data : [];
 }
@@ -40,8 +48,8 @@ function earnlabRows(data) {
 function normalizeGoldtasker(row, source) {
   const user = /** @type {Record<string, unknown>} */ (row.user ?? {});
   const username = String(user.name || "anonymous");
-  const offerwall = String(row.offerwallName || "Offer");
-  const offerName = String(row.offerName || "Offer");
+  const offerwall = firstText(row.offerwallName, row.offerwall, row.network, row.provider, "Offer");
+  const offerName = firstText(row.offerName, row.offer_name, row.title, row.name, row.description, "Offer");
   const reward = asNumber(row.reward);
   const at = String(row.createdAt || new Date().toISOString());
   const id = String(row.id || hashId(String(source.id), [username, offerwall, offerName, reward, at]));
@@ -70,8 +78,8 @@ function normalizeGoldtasker(row, source) {
  */
 function normalizeLootycash(row, source) {
   const username = String(row.username || row.user_name || row.user_id || "anonymous");
-  const offerwall = String(row.offerwall || row.type || "Offer");
-  const offerName = String(row.offer_name || row.offerName || "Offer");
+  const offerwall = firstText(row.offerwall, row.offerwallName, row.network, row.provider, row.type, "Offer");
+  const offerName = firstText(row.offer_name, row.offerName, row.title, row.name, row.description, "Offer");
   const reward = asNumber(row.reward);
   const at = String(row.dateUTC || row.date || row.createdAt || new Date().toISOString());
   const id = String(row._id || row.transactionId || hashId(String(source.id), [username, offerwall, offerName, reward, at]));

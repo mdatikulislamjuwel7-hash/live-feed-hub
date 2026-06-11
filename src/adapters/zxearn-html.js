@@ -18,6 +18,37 @@ function pickTooltipValue(html, label) {
   return value;
 }
 
+function tooltipHtml(item) {
+  return (
+    item.attr("data-bs-original-title") ||
+    item.attr("data-original-title") ||
+    item.attr("data-tippy-content") ||
+    item.attr("data-tooltip") ||
+    item.attr("title") ||
+    ""
+  );
+}
+
+function relativeToIso(text) {
+  const value = String(text || "").toLowerCase();
+  const now = Date.now();
+  if (!value || value.includes("just now")) return new Date(now).toISOString();
+  const match = value.match(/(\d+)\s*(second|minute|hour|day|week|month|year)s?\s+ago/);
+  if (!match) return new Date(now).toISOString();
+  const amount = Number(match[1]);
+  const multipliers = {
+    second: 1000,
+    minute: 60_000,
+    hour: 3_600_000,
+    day: 86_400_000,
+    week: 604_800_000,
+    month: 2_592_000_000,
+    year: 31_536_000_000,
+  };
+  const unit = /** @type {keyof typeof multipliers} */ (match[2]);
+  return new Date(now - amount * multipliers[unit]).toISOString();
+}
+
 function toNumber(value) {
   const num = Number(String(value ?? "0").replace(/[^0-9.-]/g, ""));
   return Number.isFinite(num) ? num : 0;
@@ -45,20 +76,29 @@ export async function fetchZxearnHtml(source) {
 
   $(".user-List-CSM[data-feed-type='offer']").each((_, el) => {
     const item = $(el);
-    const tooltip = item.attr("data-bs-original-title") || "";
+    const tooltip = tooltipHtml(item);
     const user = clean(item.find(".l_p_ti").first().text()) || "anonymous";
     const offerwall =
       pickTooltipValue(tooltip, "Name") ||
       clean(item.find(".l_p_ti_1").first().text()) ||
       "Offer";
-    const offerName = pickTooltipValue(tooltip, "Offername") || "Offer";
+    const offerName =
+      pickTooltipValue(tooltip, "Offername") ||
+      pickTooltipValue(tooltip, "Offer Name") ||
+      pickTooltipValue(tooltip, "Title") ||
+      "Offer";
     const amountText =
       pickTooltipValue(tooltip, "Amount") || clean(item.find(".pd_amm").first().text());
     const amount = toNumber(amountText);
     const rawId = item.attr("data-id") || item.attr("data-user-id") || "";
+    const timeText =
+      pickTooltipValue(tooltip, "Time") ||
+      pickTooltipValue(tooltip, "Date") ||
+      clean(item.text().match(/(?:just now|\d+\s+(?:second|minute|hour|day|week|month|year)s?\s+ago)/i)?.[0] || "");
+    const at = relativeToIso(timeText);
     const id = crypto
       .createHash("sha256")
-      .update(`${source.id}|${rawId}|${user}|${offerwall}|${offerName}|${amount}`)
+      .update(`${source.id}|${rawId}|${user}|${offerwall}|${offerName}|${amount}|${timeText || "live"}`)
       .digest("hex")
       .slice(0, 24);
 
@@ -75,7 +115,7 @@ export async function fetchZxearnHtml(source) {
       amount,
       unit: "coins",
       rawAmount: amountText || `${amount} coins`,
-      at: new Date().toISOString(),
+      at,
     });
   });
 
