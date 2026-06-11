@@ -62,8 +62,8 @@ function amount(event) {
   return `${event.amount} ${event.unit || "points"}`;
 }
 
-function field(label, value) {
-  return `<b>${label}</b> ${escapeHtml(value || "-")}`;
+function field(label, value, icon = "") {
+  return `${icon ? `${icon} ` : ""}<b>${label}</b> ${escapeHtml(value || "-")}`;
 }
 
 function formatEventTime(event) {
@@ -134,12 +134,12 @@ function eventLine(event) {
   const user = event.user ? `@${event.user}` : "unknown user";
   return [
     divider,
-    field("Website", event.sourceName || event.source),
-    field("Offer", name),
-    field("Network", wall),
-    field("Reward", amount(event)),
-    field("User", user),
-    field("Completed", formatEventTime(event)),
+    field("Website:", event.sourceName || event.source, "🌐"),
+    field("Offer:", name, "🎯"),
+    field("Network:", wall, "🧱"),
+    field("Reward:", amount(event), "💰"),
+    field("User:", user, "👤"),
+    field("Completed:", formatEventTime(event), "⏰"),
     divider,
   ].join("\n");
 }
@@ -205,7 +205,7 @@ export async function notifyTelegram(events) {
     const eventId = String(event.id || "");
     if (eventId && sentAlertIds.has(eventId)) continue;
     if (eventId) sentAlertIds.set(eventId, Date.now());
-    const title = isHighValue(event) ? "HIGH VALUE LIVE LEAD" : "NEW LIVE LEAD";
+    const title = isHighValue(event) ? "🔥 HIGH VALUE LIVE LEAD" : "🚀 NEW LIVE LEAD";
     queueTelegramAlert(`<b>${title}</b>\n${eventLine(event)}`);
   }
 }
@@ -218,21 +218,21 @@ export async function notifySourceHealthChange(source, health, previousHealth) {
   if (status === "error") {
     await sendTelegramMessage(
       [
-        "<b>SOURCE CHECK</b>",
+        "<b>⚠️ SOURCE CHECK</b>",
         divider,
-        field("Website", source?.name || source?.id || "Source"),
-        field("Status", "Needs attention"),
-        field("Details", cleanHealthError(health?.lastError)),
+        field("Website:", source?.name || source?.id || "Source", "🌐"),
+        field("Status:", "Needs attention", "📡"),
+        field("Details:", cleanHealthError(health?.lastError), "📝"),
         divider,
       ].join("\n")
     );
   } else if (status === "ok" && previousStatus === "error") {
     await sendTelegramMessage(
       [
-        "<b>SOURCE RECOVERED</b>",
+        "<b>✅ SOURCE RECOVERED</b>",
         divider,
-        field("Website", source?.name || source?.id || "Source"),
-        field("Status", "Working again"),
+        field("Website:", source?.name || source?.id || "Source", "🌐"),
+        field("Status:", "Working again", "📡"),
         divider,
       ].join("\n")
     );
@@ -245,23 +245,23 @@ export function telegramStatus() {
 
 function helpText() {
   return [
-    "<b>LIVE FEED HUB BOT</b>",
+    "<b>⚡ LIVE FEED HUB BOT</b>",
     divider,
-    field("/status", "server summary"),
-    field("/sources", "source health"),
-    field("/sites", "clickable site feed menu"),
-    field("/feed", "latest all sites"),
-    field("/feed apucash", "latest from one source"),
-    field("/top", "daily top offers"),
-    field("/topcoins", "highest coin offers today"),
-    field("/search binance", "search feed history"),
+    field("/status", "server summary", "📊"),
+    field("/sources", "source health", "📡"),
+    field("/sites", "clickable site feed menu", "🌐"),
+    field("/feed", "latest all sites", "🚀"),
+    field("/feed apucash", "latest from one source", "🎯"),
+    field("/top", "daily top offers", "🏆"),
+    field("/topcoins", "highest coin offers today", "💎"),
+    field("/search binance", "search feed history", "🔎"),
     divider,
   ].join("\n");
 }
 
 function formatFeed(events, title = "Latest Feed") {
   if (!events.length) return "No feed rows yet.";
-  return `<b>${escapeHtml(title.toUpperCase())}</b>\n${events.slice(0, 10).map(eventLine).join("\n")}`;
+  return `<b>🚀 ${escapeHtml(title.toUpperCase())}</b>\n${events.slice(0, 10).map(eventLine).join("\n")}`;
 }
 
 function formatSources(sources) {
@@ -273,7 +273,7 @@ function formatSources(sources) {
       return `<b>${escapeHtml(source.name)}</b> | ${escapeHtml(status)} | ${escapeHtml(health.count || 0)} rows`;
     })
     .join("\n");
-  return `<b>SOURCE HEALTH</b>\n${divider}\n${rows}\n${divider}`;
+  return `<b>📡 SOURCE HEALTH</b>\n${divider}\n${rows}\n${divider}`;
 }
 
 function sourceNameMap(sources) {
@@ -324,7 +324,7 @@ function formatTopOffers(data, sources = []) {
       return `${divider}\n<b>${escapeHtml(names.get(sourceId) || sourceId)}</b>\n${rows || "No rows"}`;
     })
     .join("\n\n");
-  return `<b>DAILY TOP OFFERS</b>\n${rows}\n${divider}`;
+  return `<b>🏆 DAILY TOP OFFERS</b>\n${rows}\n${divider}`;
 }
 
 function formatTopCoins(data, sources = [], limit = 15) {
@@ -342,12 +342,12 @@ function formatTopCoins(data, sources = [], limit = 15) {
 
   if (!rows.length) return "No high coin offers recorded yet today.";
   return [
-    `<b>HIGHEST COIN OFFERS</b>`,
-    field("Day", data.day || "today"),
+    `<b>💎 HIGHEST COIN OFFERS</b>`,
+    field("Day:", data.day || "today", "📅"),
     divider,
     ...rows.map(
       (offer, index) =>
-        `#${index + 1} <b>${escapeHtml(offer.sourceName)}</b>\n${field("Offer", offer.offer)}\n${field("Reward", offer.maxRawAmount || `${offer.maxAmount}`)}`
+        `#${index + 1} <b>${escapeHtml(offer.sourceName)}</b>\n${field("Offer:", offer.offer, "🎯")}\n${field("Reward:", offer.maxRawAmount || `${offer.maxAmount}`, "💰")}`
     ),
     divider,
   ].join("\n");
@@ -381,7 +381,7 @@ function formatAutoTopReport(data, sources = []) {
     ? byFrequency
         .map(
           (offer, index) =>
-            `#${index + 1} <b>${escapeHtml(offer.sourceName)}</b>\n${field("Offer", offer.offer)}\n${field("Hits", `${offer.count}x`)}`
+            `#${index + 1} <b>${escapeHtml(offer.sourceName)}</b>\n${field("Offer:", offer.offer, "🎯")}\n${field("Hits:", `${offer.count}x`, "🔁")}`
         )
         .join("\n")
     : "No rows";
@@ -389,20 +389,20 @@ function formatAutoTopReport(data, sources = []) {
     ? byCoins
         .map(
           (offer, index) =>
-            `#${index + 1} <b>${escapeHtml(offer.sourceName)}</b>\n${field("Offer", offer.offer)}\n${field("Reward", offer.maxRawAmount || `${offer.maxAmount}`)}`
+            `#${index + 1} <b>${escapeHtml(offer.sourceName)}</b>\n${field("Offer:", offer.offer, "🎯")}\n${field("Reward:", offer.maxRawAmount || `${offer.maxAmount}`, "💰")}`
         )
         .join("\n")
     : "No rows";
 
   return [
-    "<b>HOURLY TOP REPORT</b>",
-    field("Day", data.day || "today"),
-    field("Timezone", "BDT"),
+    "<b>📌 HOURLY TOP REPORT</b>",
+    field("Day:", data.day || "today", "📅"),
+    field("Timezone:", "BDT", "⏰"),
     divider,
-    "<b>TOP OFFERS - MOST COMPLETED</b>",
+    "<b>🏆 TOP OFFERS - MOST COMPLETED</b>",
     frequencyRows,
     divider,
-    "<b>TOP COINS - HIGHEST REWARD</b>",
+    "<b>💎 TOP COINS - HIGHEST REWARD</b>",
     coinRows,
     divider,
   ].join("\n");
@@ -429,7 +429,7 @@ function formatSearchResults(events, query) {
     })
     .slice(0, 10);
   if (!rows.length) return `No history found for: ${escapeHtml(query)}`;
-  return `<b>SEARCH RESULTS</b>\n${field("Query", query)}\n${rows.map(eventLine).join("\n")}`;
+  return `<b>🔎 SEARCH RESULTS</b>\n${field("Query:", query, "⌨️")}\n${rows.map(eventLine).join("\n")}`;
 }
 
 async function sendAndPinTopReport(handlers, target = chatId) {
@@ -544,13 +544,19 @@ export function startTelegramBot(handlers) {
           } else if (cmd === "/status") {
             const stats = handlers.getStats();
             await sendTelegramMessage(
-              `<b>Status</b>\nTotal rows: ${escapeHtml(stats.total || 0)}\nLast updated: ${escapeHtml(stats.lastUpdated || "none")}`,
+              [
+                "<b>📊 STATUS</b>",
+                divider,
+                field("Total rows:", stats.total || 0, "📦"),
+                field("Last updated:", stats.lastUpdated || "none", "⏰"),
+                divider,
+              ].join("\n"),
               target
             );
           } else if (cmd === "/sources") {
             await sendTelegramMessage(formatSources(handlers.getSources()), target);
           } else if (cmd === "/sites") {
-            await sendTelegramMessage(`<b>SELECT WEBSITE</b>\n${divider}`, target, {
+            await sendTelegramMessage(`<b>🌐 SELECT WEBSITE</b>\n${divider}`, target, {
               reply_markup: sourceButtons(sources, "feed"),
             });
           } else if (cmd === "/feed") {
