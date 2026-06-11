@@ -6,6 +6,72 @@ function amountFrom(text) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function cleanText(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function htmlToText(value) {
+  const raw = String(value || "");
+  if (!raw) return "";
+  return cleanText(cheerio.load(raw).text() || raw);
+}
+
+function tooltipValue(text, label) {
+  const pattern = new RegExp(`${label}\\s*[:\\-]\\s*([^|\\n]+)`, "i");
+  return cleanText(text.match(pattern)?.[1] || "");
+}
+
+function splitOfferName(value, fallbackWall) {
+  const text = cleanText(value);
+  if (!text) return null;
+  const parts = text.split(/\s+(?:-|→|—)\s+/).map(cleanText).filter(Boolean);
+  if (parts.length >= 2) {
+    return {
+      offerwall: parts[0],
+      offerName: parts.slice(1).join(" - "),
+    };
+  }
+  if (fallbackWall && text.toLowerCase() === String(fallbackWall).toLowerCase()) return null;
+  return {
+    offerwall: fallbackWall,
+    offerName: text,
+  };
+}
+
+function attrOfferDetails($, el, fallbackWall) {
+  const candidates = [
+    el.attr("data-bs-original-title"),
+    el.attr("data-original-title"),
+    el.attr("data-title"),
+    el.attr("aria-label"),
+    el.attr("title"),
+    el.attr("x-tooltip"),
+  ].map(htmlToText).filter(Boolean);
+
+  for (const text of candidates) {
+    const named =
+      tooltipValue(text, "Offer Name") ||
+      tooltipValue(text, "Offername") ||
+      tooltipValue(text, "Name") ||
+      tooltipValue(text, "Offer");
+    const wall = tooltipValue(text, "Offerwall") || fallbackWall;
+    const parsed = splitOfferName(named, wall);
+    if (parsed?.offerName) return parsed;
+  }
+
+  const hiddenText = cleanText(
+    el
+      .find("[class*='tooltip'],[class*='hidden'],[style*='display: none'],[style*='display:none']")
+      .text()
+  );
+  const hiddenName =
+    tooltipValue(hiddenText, "Offer Name") ||
+    tooltipValue(hiddenText, "Offername") ||
+    tooltipValue(hiddenText, "Name") ||
+    tooltipValue(hiddenText, "Offer");
+  return splitOfferName(hiddenName, fallbackWall);
+}
+
 /**
  * Public homepage ticker cards (Rubcashly-style completed offers).
  * @param {Record<string, unknown>} source
@@ -31,16 +97,18 @@ export async function fetchTickerCardsHtml(source) {
 
   $(`${root} .ticker-card`).each((_, card) => {
     const el = $(card);
-    const user = el.find("p.font-medium").first().text().trim();
+    const user = cleanText(el.find("p.font-medium").first().text());
     const row = el.find(".flex.w-full.items-center.gap-2").first();
-    const offerwall = row.find("span.text-xs").first().text().trim() || "Offer";
+    let offerwall = cleanText(row.find("span.text-xs").first().text()) || "Offer";
     const amountText =
-      row.find("span.flex span").last().text().trim() ||
-      row.find("span").last().text().trim();
+      cleanText(row.find("span.flex span").last().text()) ||
+      cleanText(row.find("span").last().text());
     if (!user) return;
 
     const amount = amountFrom(amountText);
-    const offerName = isWithdraw ? `${offerwall} withdrawal` : "Completed offer";
+    const details = attrOfferDetails($, el, offerwall);
+    if (details?.offerwall) offerwall = details.offerwall;
+    const offerName = details?.offerName || (isWithdraw ? `${offerwall} withdrawal` : `${offerwall} reward`);
     const key = `${user}|${offerwall}|${amountText}|${isWithdraw ? "w" : "o"}`;
     if (seen.has(key)) return;
     seen.add(key);

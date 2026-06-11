@@ -42,19 +42,6 @@
     "pollSeconds": 45
   },
   {
-    "id": "lootgain",
-    "name": "LootGain",
-    "enabled": true,
-    "type": "graphql-feed",
-    "schema": "lootgain",
-    "url": "https://api.lootgain.com/graphql",
-    "origin": "https://lootgain.com",
-    "referer": "https://lootgain.com/",
-    "query": "query { getLiveRewards { id name user amount avatar } }",
-    "color": "#f97316",
-    "pollSeconds": 35
-  },
-  {
     "id": "zxearn",
     "name": "ZxEarn",
     "enabled": true,

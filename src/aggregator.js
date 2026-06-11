@@ -26,6 +26,9 @@ export const sourceHealth = {};
 /** @type {Map<string, NodeJS.Timeout>} */
 const timers = new Map();
 
+/** @type {Set<string>} */
+const alertPrimedSources = new Set();
+
 /** @type {ReturnType<typeof setTimeout> | null} */
 let persistTimer = null;
 
@@ -65,12 +68,17 @@ async function pollOne(source) {
       }
     }
     const added = upsertMany(events);
+    const alertReady = alertPrimedSources.has(id);
     if (added.length > 0) {
       recordDailyImpressions(id, added);
       broadcastNew(added);
-      notifyTelegram(added).catch((err) => {
-        console.warn(`[telegram] ${err instanceof Error ? err.message : String(err)}`);
-      });
+      if (alertReady) {
+        notifyTelegram(added).catch((err) => {
+          console.warn(`[telegram] ${err instanceof Error ? err.message : String(err)}`);
+        });
+      } else {
+        console.log(`[${id}] skipped ${added.length} initial Telegram alerts`);
+      }
     }
     /** @type {string | null} */
     let note = null;
@@ -94,6 +102,7 @@ async function pollOne(source) {
     notifySourceHealthChange(source, sourceHealth[id], previousHealth).catch((err) => {
       console.warn(`[telegram] ${err instanceof Error ? err.message : String(err)}`);
     });
+    alertPrimedSources.add(id);
     console.log(`[${id}] ${events.length} items, ${added.length} new`);
     schedulePersist();
   } catch (err) {

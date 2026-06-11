@@ -24,6 +24,11 @@ function normalizeKeyPart(value) {
     .trim();
 }
 
+function isGenericOfferName(value) {
+  const text = normalizeKeyPart(value);
+  return text === "completed offer" || text === "offer";
+}
+
 /**
  * Same user + same offer + same amount should not be inserted repeatedly when
  * a source refreshes a ticker with slightly different relative timestamps.
@@ -60,7 +65,10 @@ function findRecentDuplicate(event) {
  */
 function mergeEvent(existing, incoming) {
   let changed = false;
-  if (!existing.offerName && incoming.offerName) {
+  if (
+    incoming.offerName &&
+    (!existing.offerName || isGenericOfferName(existing.offerName))
+  ) {
     existing.offerName = incoming.offerName;
     existing.offer = incoming.offer;
     changed = true;

@@ -13,9 +13,17 @@ const sourceFilter = new Set(
     .filter(Boolean)
 );
 const commandsEnabled = process.env.TELEGRAM_BOT_COMMANDS !== "false";
-const dailyTopPinEnabled = process.env.TELEGRAM_DAILY_TOP_PIN !== "false";
-const dailyTopPinIntervalMs =
-  Math.max(1, Number(process.env.TELEGRAM_DAILY_TOP_PIN_HOURS || 24)) * 60 * 60 * 1000;
+const autoTopPinEnabled =
+  process.env.TELEGRAM_AUTO_TOP_PIN !== "false" &&
+  process.env.TELEGRAM_DAILY_TOP_PIN !== "false";
+const autoTopPinIntervalMs =
+  Math.max(
+    1,
+    Number(process.env.TELEGRAM_AUTO_TOP_PIN_HOURS || process.env.TELEGRAM_DAILY_TOP_PIN_HOURS || 1)
+  ) *
+  60 *
+  60 *
+  1000;
 const topCoinsPinLimit = Math.min(
   40,
   Math.max(5, Number(process.env.TELEGRAM_TOPCOINS_PIN_LIMIT || 30))
@@ -23,10 +31,19 @@ const topCoinsPinLimit = Math.min(
 const highCoinAmount = Number(process.env.TELEGRAM_HIGH_COIN_AMOUNT || 1000);
 const highUsdAmount = Number(process.env.TELEGRAM_HIGH_USD_AMOUNT || 10);
 const divider = "━━━━━━━━━━━━━━━━";
+const alertSendDelayMs = Math.max(500, Number(process.env.TELEGRAM_ALERT_DELAY_MS || 1500));
+const alertDedupeMs = Math.max(1, Number(process.env.TELEGRAM_ALERT_DEDUPE_HOURS || 24)) * 60 * 60 * 1000;
 
 let updateOffset = 0;
 let botStarted = false;
-let dailyTopPinStarted = false;
+let autoTopPinStarted = false;
+let alertQueueRunning = false;
+
+/** @type {{ text: string, targetChatId: string }[]} */
+const alertQueue = [];
+
+/** @type {Map<string, number>} */
+const sentAlertIds = new Map();
 
 function enabled() {
   return Boolean(token && chatId);
@@ -61,7 +78,7 @@ function formatEventTime(event) {
         : seconds < 86400
           ? `${Math.floor(seconds / 3600)}h ago`
           : `${Math.floor(seconds / 86400)}d ago`;
-  return `${relative} (${new Date(time).toLocaleString("en-US", { timeZone: "UTC" })} UTC)`;
+  return `${relative} (${new Date(time).toLocaleString("en-US", { timeZone: "Asia/Dhaka" })} BDT)`;
 }
 
 function isAllowedChat(id) {
@@ -71,6 +88,37 @@ function isAllowedChat(id) {
 function shouldAlert(event) {
   if (sourceFilter.size && !sourceFilter.has(String(event.source))) return false;
   return true;
+}
+
+function pruneSentAlertIds() {
+  const cutoff = Date.now() - alertDedupeMs;
+  for (const [id, at] of sentAlertIds) {
+    if (at < cutoff) sentAlertIds.delete(id);
+  }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function queueTelegramAlert(text, targetChatId = chatId) {
+  if (!token || !targetChatId) return;
+  alertQueue.push({ text, targetChatId });
+  if (alertQueueRunning) return;
+  alertQueueRunning = true;
+  (async () => {
+    while (alertQueue.length) {
+      const item = alertQueue.shift();
+      if (!item) continue;
+      try {
+        await sendTelegramMessage(item.text, item.targetChatId);
+      } catch (err) {
+        console.warn(`[telegram] ${err instanceof Error ? err.message : String(err)}`);
+      }
+      if (alertQueue.length) await sleep(alertSendDelayMs);
+    }
+    alertQueueRunning = false;
+  })();
 }
 
 function isHighValue(event) {
@@ -150,11 +198,15 @@ async function pinTelegramMessage(messageId, targetChatId = chatId) {
  */
 export async function notifyTelegram(events) {
   if (!enabled() || !events.length) return;
+  pruneSentAlertIds();
   const filtered = events.filter(shouldAlert);
   if (!filtered.length) return;
   for (const event of filtered) {
+    const eventId = String(event.id || "");
+    if (eventId && sentAlertIds.has(eventId)) continue;
+    if (eventId) sentAlertIds.set(eventId, Date.now());
     const title = isHighValue(event) ? "HIGH VALUE LIVE LEAD" : "NEW LIVE LEAD";
-    await sendTelegramMessage(`<b>${title}</b>\n${eventLine(event)}`);
+    queueTelegramAlert(`<b>${title}</b>\n${eventLine(event)}`);
   }
 }
 
@@ -301,6 +353,61 @@ function formatTopCoins(data, sources = [], limit = 15) {
   ].join("\n");
 }
 
+function formatAutoTopReport(data, sources = []) {
+  const names = sourceNameMap(sources);
+  const sourceRows = Object.entries(data.bySource || {});
+  const byFrequency = sourceRows
+    .flatMap(([sourceId, block]) =>
+      (block.byFrequency || []).map((offer) => ({
+        ...offer,
+        sourceName: names.get(sourceId) || sourceId,
+      }))
+    )
+    .sort((a, b) => Number(b.count || 0) - Number(a.count || 0) || Number(b.maxAmount || 0) - Number(a.maxAmount || 0))
+    .slice(0, 10);
+  const byCoins = sourceRows
+    .flatMap(([sourceId, block]) =>
+      (block.byCoins || []).map((offer) => ({
+        ...offer,
+        sourceName: names.get(sourceId) || sourceId,
+      }))
+    )
+    .sort((a, b) => Number(b.maxAmount || 0) - Number(a.maxAmount || 0) || Number(b.count || 0) - Number(a.count || 0))
+    .slice(0, 10);
+
+  if (!byFrequency.length && !byCoins.length) return "No top offers recorded yet.";
+
+  const frequencyRows = byFrequency.length
+    ? byFrequency
+        .map(
+          (offer, index) =>
+            `#${index + 1} <b>${escapeHtml(offer.sourceName)}</b>\n${field("Offer", offer.offer)}\n${field("Hits", `${offer.count}x`)}`
+        )
+        .join("\n")
+    : "No rows";
+  const coinRows = byCoins.length
+    ? byCoins
+        .map(
+          (offer, index) =>
+            `#${index + 1} <b>${escapeHtml(offer.sourceName)}</b>\n${field("Offer", offer.offer)}\n${field("Reward", offer.maxRawAmount || `${offer.maxAmount}`)}`
+        )
+        .join("\n")
+    : "No rows";
+
+  return [
+    "<b>HOURLY TOP REPORT</b>",
+    field("Day", data.day || "today"),
+    field("Timezone", "BDT"),
+    divider,
+    "<b>TOP OFFERS - MOST COMPLETED</b>",
+    frequencyRows,
+    divider,
+    "<b>TOP COINS - HIGHEST REWARD</b>",
+    coinRows,
+    divider,
+  ].join("\n");
+}
+
 function formatSearchResults(events, query) {
   const needle = String(query || "").trim().toLowerCase();
   if (!needle) return "Usage: /search offer-name";
@@ -325,37 +432,36 @@ function formatSearchResults(events, query) {
   return `<b>SEARCH RESULTS</b>\n${field("Query", query)}\n${rows.map(eventLine).join("\n")}`;
 }
 
-async function sendAndPinTopCoins(handlers, target = chatId) {
+async function sendAndPinTopReport(handlers, target = chatId) {
   const sources = handlers.getSources();
-  const text = formatTopCoins(
+  const text = formatAutoTopReport(
     handlers.getDailyTopOffers({ source: "all", limit: topCoinsPinLimit }),
-    sources,
-    topCoinsPinLimit
+    sources
   );
-  if (text.startsWith("No high coin offers")) return false;
+  if (text.startsWith("No top offers")) return false;
   const message = await sendTelegramMessage(text, target);
   await pinTelegramMessage(message?.message_id, target);
   return true;
 }
 
-function startDailyTopPin(handlers) {
-  if (!dailyTopPinEnabled || dailyTopPinStarted) return;
-  dailyTopPinStarted = true;
+function startAutoTopPin(handlers) {
+  if (!autoTopPinEnabled || autoTopPinStarted) return;
+  autoTopPinStarted = true;
 
   const run = async () => {
     try {
-      const pinned = await sendAndPinTopCoins(handlers);
-      console.log(`[telegram] daily top coin pin ${pinned ? "sent" : "skipped"}`);
+      const pinned = await sendAndPinTopReport(handlers);
+      console.log(`[telegram] hourly top report pin ${pinned ? "sent" : "skipped"}`);
     } catch (err) {
-      console.warn(`[telegram] daily top coin pin failed: ${err instanceof Error ? err.message : String(err)}`);
+      console.warn(`[telegram] hourly top report pin failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
   setTimeout(() => {
     run();
-    setInterval(run, dailyTopPinIntervalMs);
-  }, dailyTopPinIntervalMs);
-  console.log(`[telegram] daily top coin pin every ${Math.round(dailyTopPinIntervalMs / 3600000)}h`);
+    setInterval(run, autoTopPinIntervalMs);
+  }, autoTopPinIntervalMs);
+  console.log(`[telegram] hourly top report pin every ${Math.round(autoTopPinIntervalMs / 3600000)}h`);
 }
 
 async function getUpdates() {
@@ -481,6 +587,6 @@ export function startTelegramBot(handlers) {
   };
 
   loop();
-  startDailyTopPin(handlers);
+  startAutoTopPin(handlers);
   console.log("[telegram] bot commands enabled");
 }
