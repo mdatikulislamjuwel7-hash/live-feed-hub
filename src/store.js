@@ -1,7 +1,10 @@
 export const PAGE_SIZE = 50;
 export const SOURCE_HISTORY_LIMIT = 400;
 export const HISTORY_PAGES = Math.ceil(SOURCE_HISTORY_LIMIT / PAGE_SIZE);
-const DEDUPE_WINDOW_MS = 24 * 60 * 60 * 1000;
+const DEDUPE_WINDOW_MS = Math.max(
+  60_000,
+  Number(process.env.FEED_DEDUPE_WINDOW_MINUTES || 10) * 60 * 1000
+);
 /** @type {Map<string, import('./types.js').FeedEvent>} */
 const byId = new Map();
 
@@ -447,6 +450,85 @@ export function getDailyTopOffers(opts = {}) {
 
   return {
     day: impressionDay || todayKey(),
+    bySource,
+  };
+}
+
+/**
+ * Build top offers from a moving time window, used for true hourly reports.
+ * @param {{ source?: string, limit?: number, windowMs?: number }} [opts]
+ */
+export function getRecentTopOffers(opts = {}) {
+  const limit = Math.min(15, Math.max(1, Number(opts.limit) || 8));
+  const windowMs = Math.max(60_000, Number(opts.windowMs) || 60 * 60 * 1000);
+  const cutoff = Date.now() - windowMs;
+  const filterSource = opts.source && opts.source !== "all" ? opts.source : null;
+  const buckets = new Map();
+
+  for (const event of ordered) {
+    const time = toTime(event);
+    if (!time || time < cutoff) continue;
+    if (filterSource && event.source !== filterSource) continue;
+    const sourceId = event.source;
+    if (!buckets.has(sourceId)) buckets.set(sourceId, new Map());
+    const bucket = buckets.get(sourceId);
+    const label = event.offerName
+      ? `${event.offerwall || ""} → ${event.offerName}`.replace(/^ → /, "")
+      : event.offer || event.offerwall || "";
+    const key = label.toLowerCase().trim();
+    if (!key) continue;
+    const amount = Number(event.amount) || 0;
+    const unit = event.unit ? String(event.unit) : "coins";
+    const rawAmount = event.rawAmount || (amount > 0 ? `${amount} ${unit}` : "");
+    const row = bucket.get(key);
+    if (row) {
+      row.count += 1;
+      if (time > new Date(row.latestAt || 0).getTime()) row.latestAt = event.at;
+      if (amount > row.maxAmount) {
+        row.maxAmount = amount;
+        row.maxRawAmount = rawAmount || row.maxRawAmount;
+        row.unit = unit;
+      }
+    } else {
+      bucket.set(key, {
+        offer: label,
+        count: 1,
+        maxAmount: amount,
+        maxRawAmount: rawAmount,
+        unit,
+        latestAt: event.at,
+      });
+    }
+  }
+
+  const bySource = {};
+  for (const [sourceId, bucket] of buckets) {
+    const rows = [...bucket.values()];
+    const mapRow = (row, rank) => ({
+      offer: row.offer,
+      count: row.count,
+      maxAmount: row.maxAmount,
+      maxRawAmount: row.maxRawAmount || `${row.maxAmount} ${row.unit}`,
+      latestAt: row.latestAt,
+      rank,
+    });
+    const byFrequency = rows
+      .slice()
+      .sort((a, b) => b.count - a.count || b.maxAmount - a.maxAmount)
+      .slice(0, limit)
+      .map((row, i) => mapRow(row, i + 1));
+    const byCoins = rows
+      .filter((row) => row.maxAmount > 0)
+      .sort((a, b) => b.maxAmount - a.maxAmount || b.count - a.count)
+      .slice(0, limit)
+      .map((row, i) => mapRow(row, i + 1));
+    if (byFrequency.length || byCoins.length) {
+      bySource[sourceId] = { source: sourceId, byFrequency, byCoins };
+    }
+  }
+
+  return {
+    day: `${Math.round(windowMs / 60000)}m window`,
     bySource,
   };
 }

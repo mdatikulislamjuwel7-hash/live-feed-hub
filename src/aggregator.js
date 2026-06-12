@@ -32,6 +32,12 @@ const alertPrimedSources = new Set();
 /** @type {ReturnType<typeof setTimeout> | null} */
 let persistTimer = null;
 
+const initialAlertLimit = Math.max(0, Number(process.env.TELEGRAM_INITIAL_ALERT_LIMIT || 5));
+const initialAlertMaxAgeMs = Math.max(
+  60_000,
+  Number(process.env.TELEGRAM_INITIAL_ALERT_MAX_AGE_MINUTES || 10) * 60 * 1000
+);
+
 function schedulePersist() {
   if (persistTimer) clearTimeout(persistTimer);
   persistTimer = setTimeout(() => {
@@ -42,6 +48,22 @@ function schedulePersist() {
       );
     });
   }, 1500);
+}
+
+/**
+ * Let a few genuinely fresh rows through after redeploy while still avoiding
+ * massive old-feed floods from first source polls.
+ * @param {import('./types.js').FeedEvent[]} events
+ */
+function initialAlertCandidates(events) {
+  if (!initialAlertLimit) return [];
+  const cutoff = Date.now() - initialAlertMaxAgeMs;
+  return events
+    .filter((event) => {
+      const time = new Date(event.at || 0).getTime();
+      return Number.isFinite(time) && time >= cutoff;
+    })
+    .slice(0, initialAlertLimit);
 }
 
 /**
@@ -77,7 +99,13 @@ async function pollOne(source) {
           console.warn(`[telegram] ${err instanceof Error ? err.message : String(err)}`);
         });
       } else {
-        console.log(`[${id}] skipped ${added.length} initial Telegram alerts`);
+        const fresh = initialAlertCandidates(added);
+        if (fresh.length > 0) {
+          notifyTelegram(fresh).catch((err) => {
+            console.warn(`[telegram] ${err instanceof Error ? err.message : String(err)}`);
+          });
+        }
+        console.log(`[${id}] sent ${fresh.length}, skipped ${added.length - fresh.length} initial Telegram alerts`);
       }
     }
     /** @type {string | null} */

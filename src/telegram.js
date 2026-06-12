@@ -23,7 +23,7 @@ const topCoinsPinLimit = Math.min(
 const highCoinAmount = Number(process.env.TELEGRAM_HIGH_COIN_AMOUNT || 1000);
 const highUsdAmount = Number(process.env.TELEGRAM_HIGH_USD_AMOUNT || 10);
 const divider = "━━━━━━━━━━━━━━━━";
-const alertSendDelayMs = Math.max(500, Number(process.env.TELEGRAM_ALERT_DELAY_MS || 1500));
+const alertSendDelayMs = Math.max(300, Number(process.env.TELEGRAM_ALERT_DELAY_MS || 500));
 const alertDedupeMs = Math.max(1, Number(process.env.TELEGRAM_ALERT_DEDUPE_HOURS || 24)) * 60 * 60 * 1000;
 const minCoinAlertAmount = Math.max(0, Number(process.env.TELEGRAM_MIN_COIN_AMOUNT || 200));
 const blockedOfferPatterns = String(
@@ -486,10 +486,14 @@ function formatSearchResults(events, query) {
   return `<b>🔎 SEARCH RESULTS</b>\n${field("Query:", query, "⌨️")}\n${rows.map(eventLine).join("\n")}`;
 }
 
-async function sendAndPinTopReport(handlers, target = chatId, title = "📌 HOURLY TOP REPORT") {
+async function sendAndPinTopReport(handlers, target = chatId, title = "📌 HOURLY TOP REPORT", dataMode = "daily") {
   const sources = handlers.getSources();
+  const data =
+    dataMode === "hourly" && handlers.getRecentTopOffers
+      ? handlers.getRecentTopOffers({ source: "all", limit: topCoinsPinLimit, windowMs: 60 * 60 * 1000 })
+      : handlers.getDailyTopOffers({ source: "all", limit: topCoinsPinLimit });
   const text = formatAutoTopReport(
-    handlers.getDailyTopOffers({ source: "all", limit: topCoinsPinLimit }),
+    data,
     sources,
     title
   );
@@ -537,7 +541,7 @@ function startAutoTopPin(handlers) {
 
   const run = async () => {
     try {
-      const pinned = await sendAndPinTopReport(handlers);
+      const pinned = await sendAndPinTopReport(handlers, chatId, "📌 HOURLY TOP REPORT", "hourly");
       console.log(`[telegram] hourly top report pin ${pinned ? "sent" : "skipped"}`);
     } catch (err) {
       console.warn(`[telegram] hourly top report pin failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -605,6 +609,7 @@ async function answerCallbackQuery(id) {
  * @param {{
  *   getEvents: (opts?: { source?: string, limit?: number }) => import('./types.js').FeedEvent[],
  *   getDailyTopOffers: (opts?: { source?: string, limit?: number }) => unknown,
+ *   getRecentTopOffers?: (opts?: { source?: string, limit?: number, windowMs?: number }) => unknown,
  *   getSources: () => unknown[],
  *   getStats: () => unknown,
  * }} handlers

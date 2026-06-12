@@ -18,6 +18,7 @@ import {
   getEvents,
   getEventsPaginated,
   getDailyTopOffers,
+  getRecentTopOffers,
   addSseClient,
   broadcastNew,
   getStats as storeStats,
@@ -205,6 +206,7 @@ async function boot() {
   startTelegramBot({
     getEvents,
     getDailyTopOffers,
+    getRecentTopOffers,
     getSources: allSources,
     getStats: storeStats,
   });

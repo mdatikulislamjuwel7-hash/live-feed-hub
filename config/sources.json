@@ -6,7 +6,7 @@
     "type": "html-livewire",
     "url": "https://apucash.com",
     "color": "#7c3aed",
-    "pollSeconds": 90,
+    "pollSeconds": 60,
     "useBrowser": false,
     "profileLimit": 12
   },
@@ -17,7 +17,7 @@
     "type": "paidcash-browser",
     "url": "https://paidcash.co",
     "color": "#10b981",
-    "pollSeconds": 45,
+    "pollSeconds": 30,
     "blockOfferPatterns": ["MM Quiz", "Watch More"]
   },
   {
@@ -28,7 +28,7 @@
     "schema": "goldtasker",
     "url": "https://goldtasker.com/api/live-offers",
     "color": "#f59e0b",
-    "pollSeconds": 35
+    "pollSeconds": 30
   },
   {
     "id": "lootycash",
@@ -39,7 +39,7 @@
     "url": "https://lootycash.com/api/offers/completed",
     "referer": "https://lootycash.com/",
     "color": "#38bdf8",
-    "pollSeconds": 45
+    "pollSeconds": 30
   },
   {
     "id": "zxearn",
@@ -48,7 +48,7 @@
     "type": "zxearn-html",
     "url": "https://zxearn.com/",
     "color": "#e11d48",
-    "pollSeconds": 75
+    "pollSeconds": 45
   },
   {
     "id": "earngift",
@@ -57,7 +57,7 @@
     "type": "live-table",
     "url": "https://earngift.net/Live.php",
     "color": "#a3e635",
-    "pollSeconds": 90,
+    "pollSeconds": 45,
     "unit": "points",
     "insecureTls": true
   },
@@ -68,7 +68,7 @@
     "type": "live-table",
     "url": "https://huntskin.com/Liveoffersfinal/Live.php",
     "color": "#fb7185",
-    "pollSeconds": 90,
+    "pollSeconds": 45,
     "unit": "points"
   },
   {
@@ -90,7 +90,7 @@
     "url": "https://trevbucks.com/",
     "laravelMode": "live-cashouts",
     "color": "#facc15",
-    "pollSeconds": 90,
+    "pollSeconds": 45,
     "limit": 30
   },
   {
@@ -102,7 +102,7 @@
     "cookieFile": "config/splitdrop.cookie",
     "cookieEnv": "SPLITDROP_COOKIE",
     "color": "#22c55e",
-    "pollSeconds": 120,
+    "pollSeconds": 60,
     "limit": 30
   },
   {
@@ -113,7 +113,7 @@
     "url": "https://boostlyearn.com/",
     "laravelMode": "live-cashouts",
     "color": "#a855f7",
-    "pollSeconds": 60,
+    "pollSeconds": 45,
     "limit": 30
   },
   {
@@ -124,7 +124,7 @@
     "url": "https://rubcashly.com/",
     "tickerSelector": "#ticker-completed",
     "color": "#f43f5e",
-    "pollSeconds": 75,
+    "pollSeconds": 45,
     "limit": 40
   },
   {
@@ -136,7 +136,7 @@
     "proxyFallback": true,
     "feedType": "offer",
     "color": "#0d9488",
-    "pollSeconds": 60,
+    "pollSeconds": 45,
     "limit": 50
   },
   {
@@ -146,7 +146,7 @@
     "type": "public-live-feed",
     "url": "https://covencash.com/",
     "color": "#14b8a6",
-    "pollSeconds": 75,
+    "pollSeconds": 45,
     "limit": 40
   },
   {
@@ -158,7 +158,7 @@
     "publicFeedMode": "zombie-swiper",
     "blockOfferPatterns": ["signup_bonus", "withdraw"],
     "color": "#84cc16",
-    "pollSeconds": 90,
+    "pollSeconds": 45,
     "limit": 40
   },
   {
@@ -169,7 +169,7 @@
     "url": "https://mistcoins.com/",
     "publicFeedMode": "mistcoins",
     "color": "#f97316",
-    "pollSeconds": 75,
+    "pollSeconds": 45,
     "limit": 40
   },
   {
@@ -180,7 +180,7 @@
     "url": "https://earng.net/earn",
     "laravelMode": "live-leads",
     "color": "#6366f1",
-    "pollSeconds": 75,
+    "pollSeconds": 45,
     "limit": 30
   }
 ]
