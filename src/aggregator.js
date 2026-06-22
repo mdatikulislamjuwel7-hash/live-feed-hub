@@ -161,7 +161,8 @@ function sourcePollRank(source) {
     type === "graphql-feed" ||
     type === "paidbyte-public" ||
     type === "earnfino-leaderboard" ||
-    type === "public-live-feed"
+    type === "public-live-feed" ||
+    type === "apucash-inertia"
   ) {
     return 0;
   }
@@ -172,7 +173,8 @@ function sourcePollRank(source) {
     type === "cashlyearn-public" ||
     type === "live-table" ||
     type === "swiper-csm-feed" ||
-    type === "ticker-cards-html"
+    type === "ticker-cards-html" ||
+    type === "covencash-pusher"
   ) {
     return 1;
   }

@@ -1,5 +1,6 @@
 import { fetchTickerApi } from "./ticker-api.js";
 import { fetchHtmlLivewire } from "./html-livewire.js";
+import { fetchApucashInertia } from "./apucash-inertia.js";
 import { fetchPaidcash } from "./paidcash.js";
 import { fetchGamersuniverse } from "./gamersuniverse.js";
 import { fetchLaravelLiveFeed } from "./laravel-live-feed.js";
@@ -16,11 +17,13 @@ import { fetchRevnoDashboard } from "./revno-dashboard.js";
 import { fetchSwiperCsmFeed } from "./swiper-csm-feed.js";
 import { fetchTickerCardsHtml } from "./ticker-cards-html.js";
 import { fetchPublicLiveFeed } from "./public-live-feed.js";
+import { fetchCovencashPusher } from "./covencash-pusher.js";
 
 /** @type {Record<string, (source: Record<string, unknown>) => Promise<import('../types.js').FeedEvent[]>>} */
 const handlers = {
   "ticker-api": fetchTickerApi,
   "html-livewire": fetchHtmlLivewire,
+  "apucash-inertia": fetchApucashInertia,
   "paidcash-browser": fetchPaidcash,
   "gamersuniverse-html": fetchGamersuniverse,
   "laravel-live-feed": fetchLaravelLiveFeed,
@@ -37,6 +40,7 @@ const handlers = {
   "swiper-csm-feed": fetchSwiperCsmFeed,
   "ticker-cards-html": fetchTickerCardsHtml,
   "public-live-feed": fetchPublicLiveFeed,
+  "covencash-pusher": fetchCovencashPusher,
 };
 
 /**

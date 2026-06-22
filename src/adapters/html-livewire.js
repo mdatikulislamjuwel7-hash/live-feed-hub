@@ -10,6 +10,34 @@ function extractUserIds(html) {
   return [...String(html || "").matchAll(/userId':\s*'(\d+)'/g)].map((match) => match[1]);
 }
 
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchHtmlWithRetry(source, url) {
+  const retries = Math.max(0, Number(source.fetchRetries) || 0);
+  const timeoutMs = Number(source.timeoutMs) || 30000;
+  let lastError = null;
+
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      return await fetch(url, {
+        headers: {
+          Accept: "text/html",
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        },
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (err) {
+      lastError = err;
+      if (attempt < retries) await wait(750 * (attempt + 1));
+    }
+  }
+
+  throw lastError;
+}
+
 /**
  * ApuCash: cookie Livewire → headless browser → fast HTML.
  * @param {Record<string, unknown>} source
@@ -64,14 +92,7 @@ export async function fetchHtmlLivewire(source) {
     }
   }
 
-  const res = await fetch(url, {
-    headers: {
-      Accept: "text/html",
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    },
-    signal: AbortSignal.timeout(30000),
-  });
+  const res = await fetchHtmlWithRetry(source, url);
 
   if (!res.ok) {
     throw new Error(`${source.name}: HTTP ${res.status}`);

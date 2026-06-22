@@ -3,12 +3,13 @@
     "id": "apucash",
     "name": "ApuCash",
     "enabled": true,
-    "type": "html-livewire",
+    "type": "apucash-inertia",
     "url": "https://apucash.com",
     "color": "#7c3aed",
     "pollSeconds": 60,
-    "useBrowser": false,
-    "profileLimit": 12
+    "timeoutMs": 45000,
+    "fetchRetries": 2,
+    "limit": 35
   },
   {
     "id": "paidcash",
@@ -143,10 +144,11 @@
     "id": "covencash",
     "name": "Covencash",
     "enabled": true,
-    "type": "public-live-feed",
+    "type": "covencash-pusher",
     "url": "https://covencash.com/",
     "color": "#14b8a6",
     "pollSeconds": 45,
+    "pusherListenMs": 20000,
     "limit": 40
   },
   {

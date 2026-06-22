@@ -37,6 +37,8 @@ export async function fetchNetlifySource(source) {
       return (await import("./adapters/ticker-cards-html.js")).fetchTickerCardsHtml(source);
     case "laravel-live-feed":
       return (await import("./adapters/laravel-live-feed.js")).fetchLaravelLiveFeed(source);
+    case "apucash-inertia":
+      return (await import("./adapters/apucash-inertia.js")).fetchApucashInertia(source);
     default:
       throw new Error(`Netlify does not support adapter type: ${source.type}`);
   }
@@ -56,6 +58,5 @@ export function normalizeNetlifySource(source) {
     copy.cookieEnv = "REVNO_COOKIE";
     delete copy.cookieFile;
   }
-  if (copy.id === "apucash") copy.useBrowser = false;
   return copy;
 }
