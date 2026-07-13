@@ -22,30 +22,55 @@ export async function fetchGraphqlFeed(source) {
     throw new Error(`${source.name}: ${data.errors[0]?.message || "GraphQL error"}`);
   }
 
-  if (source.schema !== "lootgain") {
-    throw new Error(`${source.name}: unknown graphql-feed schema`);
-  }
-
+  const schema = String(source.schema || "");
   const rows = Array.isArray(data?.data?.getLiveRewards)
     ? data.data.getLiveRewards
     : [];
 
-  return rows.slice(0, Number(source.limit) || 30).map((row) => {
-    const amount = Number(row.amount || 0);
-    return {
-      id: `${source.id}-${row.id}`,
-      source: String(source.id),
-      sourceName: String(source.name),
-      user: String(row.user || "anonymous"),
-      offer: String(row.name || "Reward"),
-      offerwall: String(row.name || "Reward"),
-      offerName: "Live reward",
-      country: null,
-      isPrivate: false,
-      amount,
-      unit: "loots",
-      rawAmount: `${amount.toLocaleString()} loots`,
-      at: new Date().toISOString(),
-    };
-  });
+  if (schema === "lootgain") {
+    return rows.slice(0, Number(source.limit) || 30).map((row) => {
+      const amount = Number(row.amount || 0);
+      return {
+        id: `${source.id}-${row.id}`,
+        source: String(source.id),
+        sourceName: String(source.name),
+        user: String(row.user || "anonymous"),
+        offer: String(row.name || "Reward"),
+        offerwall: String(row.name || "Reward"),
+        offerName: "Live reward",
+        country: null,
+        isPrivate: false,
+        amount,
+        unit: "loots",
+        rawAmount: `${amount.toLocaleString()} loots`,
+        at: new Date().toISOString(),
+      };
+    });
+  }
+
+  if (schema === "redmonkey") {
+    return rows.slice(0, Number(source.limit) || 40).map((row) => {
+      const amount = Number(row.amount || 0);
+      const offerwall = String(row.provider || row.name || "Offer").trim() || "Offer";
+      const offerName = `${offerwall} live offer`;
+      return {
+        id: `${source.id}-${row.id}`,
+        source: String(source.id),
+        sourceName: String(source.name),
+        user: String(row.user || "anonymous"),
+        offer: `${offerwall} → ${offerName}`,
+        offerwall,
+        offerName,
+        country: null,
+        isPrivate: false,
+        userId: row.userId != null ? String(row.userId) : undefined,
+        amount,
+        unit: String(source.unit || "coins"),
+        rawAmount: `${amount.toLocaleString()} ${String(source.unit || "coins")}`,
+        at: new Date().toISOString(),
+      };
+    });
+  }
+
+  throw new Error(`${source.name}: unknown graphql-feed schema`);
 }

@@ -184,5 +184,20 @@
     "color": "#6366f1",
     "pollSeconds": 45,
     "limit": 30
+  },
+  {
+    "id": "redmonkey",
+    "name": "RedMonkey",
+    "enabled": true,
+    "type": "graphql-feed",
+    "schema": "redmonkey",
+    "url": "https://api.redmonkey.app/graphql",
+    "origin": "https://redmonkey.app",
+    "referer": "https://redmonkey.app/",
+    "query": "query GetLiveRewards { getLiveRewards { id userId name user avatar amount provider } }",
+    "unit": "coins",
+    "color": "#dc2626",
+    "pollSeconds": 30,
+    "limit": 40
   }
 ]
