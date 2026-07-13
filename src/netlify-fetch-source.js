@@ -39,6 +39,8 @@ export async function fetchNetlifySource(source) {
       return (await import("./adapters/laravel-live-feed.js")).fetchLaravelLiveFeed(source);
     case "apucash-inertia":
       return (await import("./adapters/apucash-inertia.js")).fetchApucashInertia(source);
+    case "redmonkey":
+      return (await import("./adapters/redmonkey.js")).fetchRedmonkey(source);
     default:
       throw new Error(`Netlify does not support adapter type: ${source.type}`);
   }

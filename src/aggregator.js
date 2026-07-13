@@ -162,7 +162,8 @@ function sourcePollRank(source) {
     type === "paidbyte-public" ||
     type === "earnfino-leaderboard" ||
     type === "public-live-feed" ||
-    type === "apucash-inertia"
+    type === "apucash-inertia" ||
+    type === "redmonkey"
   ) {
     return 0;
   }

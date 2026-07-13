@@ -1,0 +1,4 @@
+# RedMonkey JWT from browser cookie/local storage key: redmonkey_token
+# Admin/editor token unlocks getAllRewards, which includes real offer titles.
+# Example:
+# eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...

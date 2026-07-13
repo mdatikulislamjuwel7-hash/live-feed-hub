@@ -18,6 +18,7 @@ import { fetchSwiperCsmFeed } from "./swiper-csm-feed.js";
 import { fetchTickerCardsHtml } from "./ticker-cards-html.js";
 import { fetchPublicLiveFeed } from "./public-live-feed.js";
 import { fetchCovencashPusher } from "./covencash-pusher.js";
+import { fetchRedmonkey } from "./redmonkey.js";
 
 /** @type {Record<string, (source: Record<string, unknown>) => Promise<import('../types.js').FeedEvent[]>>} */
 const handlers = {
@@ -41,6 +42,7 @@ const handlers = {
   "ticker-cards-html": fetchTickerCardsHtml,
   "public-live-feed": fetchPublicLiveFeed,
   "covencash-pusher": fetchCovencashPusher,
+  redmonkey: fetchRedmonkey,
 };
 
 /**
