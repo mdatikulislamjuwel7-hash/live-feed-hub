@@ -121,9 +121,10 @@
     "id": "rubcashly",
     "name": "Rubcashly",
     "enabled": true,
-    "type": "ticker-cards-html",
-    "url": "https://rubcashly.com/",
-    "tickerSelector": "#ticker-completed",
+    "type": "json-feed",
+    "schema": "rubcashly",
+    "url": "https://rubcashly.com/recent-completed-offers",
+    "referer": "https://rubcashly.com/",
     "color": "#f43f5e",
     "pollSeconds": 45,
     "limit": 40

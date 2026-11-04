@@ -178,7 +178,38 @@ function normalizePaidkash(row, source) {
   };
 }
 
+/**
+ * The feed has no id, offer name or time, so rows are keyed on their content
+ * and dated when first fetched, like the public-live-feed adapter.
+ * @param {Record<string, unknown>} row
+ * @param {Record<string, unknown>} source
+ * @returns {import('../types.js').FeedEvent}
+ */
+function normalizeRubcashly(row, source) {
+  const username = firstText(row.name, "anonymous");
+  const offerwall = firstText(row.offerwall, "Offer");
+  const offerName = `${offerwall} live offer`;
+  const coins = asNumber(row.coins);
+
+  return {
+    id: `${source.id}-${hashId(String(source.id), [username, offerwall, coins])}`,
+    source: String(source.id),
+    sourceName: String(source.name),
+    user: username,
+    offer: `${offerwall} -> ${offerName}`,
+    offerwall,
+    offerName,
+    country: null,
+    isPrivate: false,
+    amount: coins,
+    unit: "coins",
+    rawAmount: `${coins.toLocaleString()} coins`,
+    at: new Date().toISOString(),
+  };
+}
+
 const schemas = {
+  rubcashly: { rows: goldtaskerRows, normalize: normalizeRubcashly },
   goldtasker: { rows: goldtaskerRows, normalize: normalizeGoldtasker },
   lootycash: { rows: lootycashRows, normalize: normalizeLootycash },
   earnlab: { rows: earnlabRows, normalize: normalizeEarnlab },
