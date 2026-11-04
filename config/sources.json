@@ -197,5 +197,17 @@
     "color": "#dc2626",
     "pollSeconds": 30,
     "limit": 40
+  },
+  {
+    "id": "paidkash",
+    "name": "PaidKash",
+    "enabled": true,
+    "type": "json-feed",
+    "schema": "paidkash",
+    "url": "https://paidkash.com/app/v1/live-feed",
+    "referer": "https://paidkash.com/",
+    "color": "#fb923c",
+    "pollSeconds": 45,
+    "limit": 40
   }
 ]

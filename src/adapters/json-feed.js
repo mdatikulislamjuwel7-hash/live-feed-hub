@@ -40,6 +40,11 @@ function earnlabRows(data) {
   return [];
 }
 
+/** Offer completions only: the feed also carries cashouts, which are skipped. */
+function paidkashRows(data) {
+  return Array.isArray(data) ? data.filter((row) => row?.kind === "earn") : [];
+}
+
 /**
  * @param {Record<string, unknown>} row
  * @param {Record<string, unknown>} source
@@ -139,10 +144,45 @@ function normalizeEarnlab(row, source) {
   };
 }
 
+/**
+ * @param {Record<string, unknown>} row
+ * @param {Record<string, unknown>} source
+ * @returns {import('../types.js').FeedEvent}
+ */
+function normalizePaidkash(row, source) {
+  const user = /** @type {Record<string, unknown>} */ (row.user ?? {});
+  const provider = /** @type {Record<string, unknown>} */ (row.provider ?? {});
+  const username = String(user.name || "Anonymous");
+  const offerwall = firstText(provider.name, "Offer");
+  const title = firstText(row.title, "Offer");
+  const offerName = row.stepName ? `${title} - ${row.stepName}` : title;
+  const amount = asNumber(row.amount);
+  const at = String(row.at || new Date().toISOString());
+  const id = String(row.id || hashId(String(source.id), [username, offerwall, offerName, amount, at]));
+
+  return {
+    id: `${source.id}-${id}`,
+    source: String(source.id),
+    sourceName: String(source.name),
+    user: username,
+    userId: user.id ? String(user.id) : undefined,
+    offer: truncate(`${offerwall} -> ${offerName}`),
+    offerwall,
+    offerName: truncate(offerName),
+    country: null,
+    isPrivate: !user.name,
+    amount,
+    unit: "USD",
+    rawAmount: `$${amount.toFixed(3)}`,
+    at,
+  };
+}
+
 const schemas = {
   goldtasker: { rows: goldtaskerRows, normalize: normalizeGoldtasker },
   lootycash: { rows: lootycashRows, normalize: normalizeLootycash },
   earnlab: { rows: earnlabRows, normalize: normalizeEarnlab },
+  paidkash: { rows: paidkashRows, normalize: normalizePaidkash },
 };
 
 /**
