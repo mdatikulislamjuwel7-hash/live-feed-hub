@@ -46,10 +46,13 @@
     "id": "zxearn",
     "name": "ZxEarn",
     "enabled": true,
-    "type": "zxearn-html",
-    "url": "https://zxearn.com/",
+    "type": "json-feed",
+    "schema": "zxearn",
+    "url": "https://zxearn.com/api/v1/public/live-activity",
+    "referer": "https://zxearn.com/",
     "color": "#e11d48",
-    "pollSeconds": 45
+    "pollSeconds": 45,
+    "limit": 40
   },
   {
     "id": "earngift",

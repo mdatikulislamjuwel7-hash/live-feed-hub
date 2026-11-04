@@ -208,7 +208,45 @@ function normalizeRubcashly(row, source) {
   };
 }
 
+/** Offer completions only: the feed also carries cashouts, which are skipped. */
+function zxearnRows(data) {
+  return Array.isArray(data?.items) ? data.items.filter((row) => row?.kind === "lead") : [];
+}
+
+/**
+ * The feed names only the offer, not its offerwall.
+ * @param {Record<string, unknown>} row
+ * @param {Record<string, unknown>} source
+ * @returns {import('../types.js').FeedEvent}
+ */
+function normalizeZxearn(row, source) {
+  const username = firstText(row.username, "anonymous");
+  const offerwall = "Offer";
+  const offerName = firstText(row.offer_title, row.source, "Offer");
+  const points = asNumber(row.payout_points);
+  const at = String(row.occurred_at || new Date().toISOString());
+  const id = String(row.id || hashId(String(source.id), [username, offerName, points, at]));
+
+  return {
+    id: `${source.id}-${id}`,
+    source: String(source.id),
+    sourceName: String(source.name),
+    user: username,
+    userId: row.user_id ? String(row.user_id) : undefined,
+    offer: truncate(`${offerwall} -> ${offerName}`),
+    offerwall,
+    offerName: truncate(offerName),
+    country: null,
+    isPrivate: false,
+    amount: points,
+    unit: "coins",
+    rawAmount: `${points.toLocaleString()} coins`,
+    at,
+  };
+}
+
 const schemas = {
+  zxearn: { rows: zxearnRows, normalize: normalizeZxearn },
   rubcashly: { rows: goldtaskerRows, normalize: normalizeRubcashly },
   goldtasker: { rows: goldtaskerRows, normalize: normalizeGoldtasker },
   lootycash: { rows: lootycashRows, normalize: normalizeLootycash },
