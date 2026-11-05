@@ -13,19 +13,20 @@ function relativeToIso(text) {
   const value = String(text || "").toLowerCase();
   const now = Date.now();
   if (!value || value.includes("just now")) return new Date(now).toISOString();
-  const match = value.match(/(\d+)\s*(second|minute|hour|day|week|month|year)s?\s+ago/);
+  const match = value.match(/(\d+)\s*(second|sec|s|minute|min|m|hour|hr|h|day|d|week|wk|w|month|mo|year|yr|y)s?\s+ago/);
   if (!match) return new Date(now).toISOString();
   const amount = Number(match[1]);
   const multipliers = {
-    second: 1000,
-    minute: 60_000,
-    hour: 3_600_000,
-    day: 86_400_000,
-    week: 604_800_000,
-    month: 2_592_000_000,
-    year: 31_536_000_000,
+    s: 1000,
+    m: 60_000,
+    h: 3_600_000,
+    d: 86_400_000,
+    w: 604_800_000,
+    mo: 2_592_000_000,
+    y: 31_536_000_000,
   };
-  const unit = /** @type {keyof typeof multipliers} */ (match[2]);
+  const word = match[2];
+  const unit = word.startsWith("mo") ? "mo" : word[0];
   return new Date(now - amount * multipliers[unit]).toISOString();
 }
 
@@ -40,7 +41,7 @@ function hashId(sourceId, parts) {
 function parseLeadSource(text) {
   const cleaned = cleanText(text);
   const match = cleaned.match(/^(.+?)\s-\s(.+?)\s*\(\d+\)$/);
-  if (!match) return { offerwall: "Offer", offerName: cleaned };
+  if (!match) return { offerwall: cleaned || "Offer", offerName: `${cleaned || "Offer"} live offer` };
   return { offerwall: match[1].trim(), offerName: match[2].trim() };
 }
 
@@ -74,13 +75,10 @@ function parseWinner(winner, source) {
     offerName = sourceText;
   }
 
-  const id = hashId(String(source.id), [
-    String(winner.id || user),
-    offerwall,
-    offerName,
-    amount,
-    at.slice(0, 16),
-  ]);
+  // A time in the id would change on every poll and resend the same alert.
+  const id = winner.id
+    ? hashId(String(source.id), [String(winner.id)])
+    : hashId(String(source.id), [user, offerwall, offerName, amount]);
 
   return {
     id: `${source.id}-${id}`,
@@ -102,7 +100,7 @@ function parseWinner(winner, source) {
 /**
  * @param {string} html
  */
-function extractRecentWinners(html) {
+function extractRecentWinners(html, source) {
   const $ = cheerio.load(html);
   const payload = $("script[type='application/json']")
     .toArray()
@@ -110,13 +108,13 @@ function extractRecentWinners(html) {
     .find((text) => text.includes('"recentWinners"'));
 
   if (!payload) {
-    throw new Error("ApuCash: no Inertia recentWinners payload");
+    throw new Error(`${source.name}: no Inertia recentWinners payload`);
   }
 
   const page = JSON.parse(payload);
   const winners = page?.props?.recentWinners;
   if (!Array.isArray(winners) || !winners.length) {
-    throw new Error("ApuCash: recentWinners empty");
+    throw new Error(`${source.name}: recentWinners empty`);
   }
 
   return winners;
@@ -157,9 +155,11 @@ async function fetchHomeHtml(source, url) {
 export async function fetchApucashInertia(source) {
   const url = String(source.url || "https://apucash.com");
   const html = await fetchHomeHtml(source, url);
-  const winners = extractRecentWinners(html);
+  const winners = extractRecentWinners(html, source).filter(
+    (winner) => !source.onlyLeads || winner.source_type === "Lead"
+  );
   const events = winners.map((winner) => parseWinner(winner, source));
   const named = events.filter((event) => event.offerName && !String(event.offerName).includes("coin reward"));
-  console.log(`[apucash] inertia: ${events.length} items, ${named.length} named`);
+  console.log(`[${source.id}] inertia: ${events.length} items, ${named.length} named`);
   return events.slice(0, Number(source.limit) || 35);
 }

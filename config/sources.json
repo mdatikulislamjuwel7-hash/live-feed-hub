@@ -250,5 +250,16 @@
     "color": "#3b82f6",
     "pollSeconds": 30,
     "limit": 40
+  },
+  {
+    "id": "coinreward",
+    "name": "CoinReward",
+    "enabled": true,
+    "type": "apucash-inertia",
+    "url": "https://www.coinreward.co/",
+    "onlyLeads": true,
+    "color": "#14b8a6",
+    "pollSeconds": 60,
+    "limit": 35
   }
 ]
