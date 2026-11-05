@@ -60,7 +60,9 @@ function parseWinner(winner, source) {
   let offerName = cleanText(tooltip.description) || sourceText;
 
   if (sourceType === "Lead") {
-    ({ offerwall, offerName } = parseLeadSource(sourceText));
+    // Some sites prefix the offerwall with a status, as in "Approved · Gemiad".
+    const leadSource = sourceText.includes(" · ") ? sourceText.split(" · ").pop() : sourceText;
+    ({ offerwall, offerName } = parseLeadSource(leadSource));
   } else if (sourceType === "DailyTaskProgress") {
     offerwall = "Daily Tasks";
     offerName = sourceText.replace(/^Daily task:\s*/i, "").trim() || sourceText;
@@ -156,7 +158,9 @@ export async function fetchApucashInertia(source) {
   const url = String(source.url || "https://apucash.com");
   const html = await fetchHomeHtml(source, url);
   const winners = extractRecentWinners(html, source).filter(
-    (winner) => !source.onlyLeads || winner.source_type === "Lead"
+    (winner) =>
+      (!source.onlyLeads || winner.source_type === "Lead") &&
+      (!source.approvedOnly || cleanText(winner.tooltip?.description).toLowerCase() === "approved")
   );
   const events = winners.map((winner) => parseWinner(winner, source));
   const named = events.filter((event) => event.offerName && !String(event.offerName).includes("coin reward"));

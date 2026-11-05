@@ -275,5 +275,17 @@
     "color": "#8b5cf6",
     "pollSeconds": 45,
     "limit": 40
+  },
+  {
+    "id": "loottask",
+    "name": "LootTask",
+    "enabled": true,
+    "type": "apucash-inertia",
+    "url": "https://loottask.com/",
+    "onlyLeads": true,
+    "approvedOnly": true,
+    "color": "#06b6d4",
+    "pollSeconds": 60,
+    "limit": 35
   }
 ]
