@@ -26,6 +26,13 @@ const divider = "━━━━━━━━━━━━━━━━";
 const alertSendDelayMs = Math.max(300, Number(process.env.TELEGRAM_ALERT_DELAY_MS || 500));
 const alertDedupeMs = Math.max(1, Number(process.env.TELEGRAM_ALERT_DEDUPE_HOURS || 24)) * 60 * 60 * 1000;
 const minCoinAlertAmount = Math.max(0, Number(process.env.TELEGRAM_MIN_COIN_AMOUNT || 200));
+// These sources pay in much smaller units, so the coin minimum would hide all their rows.
+const noMinCoinSources = new Set(
+  String(process.env.TELEGRAM_NO_MIN_SOURCES ?? "earngift")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean)
+);
 const blockedOfferPatterns = String(
   process.env.TELEGRAM_BLOCK_OFFER_PATTERNS ||
     "survey,mail verify,mail verification,email verify,email verification,binance"
@@ -103,12 +110,19 @@ function isCoinLikeUnit(unit) {
 function passesTelegramContentFilter(event) {
   const searchable = [event.offerName, event.offer, event.offerwall].filter(Boolean).join(" ");
   if (hasBlockedOfferText(searchable)) return false;
-  if (isCoinLikeUnit(event.unit) && Number(event.amount || 0) < minCoinAlertAmount) return false;
+  if (
+    !noMinCoinSources.has(String(event.source)) &&
+    isCoinLikeUnit(event.unit) &&
+    Number(event.amount || 0) < minCoinAlertAmount
+  ) {
+    return false;
+  }
   return true;
 }
 
-function passesTelegramOfferFilter(offer) {
+function passesTelegramOfferFilter(offer, sourceId) {
   if (hasBlockedOfferText(offer?.offer)) return false;
+  if (noMinCoinSources.has(String(sourceId))) return true;
   const raw = String(offer?.maxRawAmount || "");
   const isUsd = raw.includes("$") || String(offer?.unit || "").toUpperCase() === "USD";
   if (!isUsd && Number(offer?.maxAmount || 0) < minCoinAlertAmount) return false;
@@ -349,7 +363,7 @@ function formatTopOffers(data, sources = []) {
     .slice(0, 8)
     .map(([sourceId, block]) => {
       const rows = (block.byCoins || block.byFrequency || [])
-        .filter(passesTelegramOfferFilter)
+        .filter((offer) => passesTelegramOfferFilter(offer, sourceId))
         .slice(0, 5)
         .map(
           (offer) =>
@@ -372,7 +386,7 @@ function formatTopCoins(data, sources = [], limit = 15) {
         sourceName: names.get(sourceId) || sourceId,
       }))
     )
-    .filter(passesTelegramOfferFilter)
+    .filter((offer) => passesTelegramOfferFilter(offer, offer.sourceId))
     .sort((a, b) => Number(b.maxAmount || 0) - Number(a.maxAmount || 0) || Number(b.count || 0) - Number(a.count || 0))
     .slice(0, limit);
 
@@ -395,7 +409,7 @@ function formatAutoTopReport(data, sources = [], title = "📌 HOURLY TOP REPORT
   const byFrequency = sourceRows
     .flatMap(([sourceId, block]) =>
       (block.byFrequency || [])
-        .filter(passesTelegramOfferFilter)
+        .filter((offer) => passesTelegramOfferFilter(offer, sourceId))
         .map((offer) => ({
           ...offer,
           sourceName: names.get(sourceId) || sourceId,
@@ -406,7 +420,7 @@ function formatAutoTopReport(data, sources = [], title = "📌 HOURLY TOP REPORT
   const byCoins = sourceRows
     .flatMap(([sourceId, block]) =>
       (block.byCoins || [])
-        .filter(passesTelegramOfferFilter)
+        .filter((offer) => passesTelegramOfferFilter(offer, sourceId))
         .map((offer) => ({
           ...offer,
           sourceName: names.get(sourceId) || sourceId,
