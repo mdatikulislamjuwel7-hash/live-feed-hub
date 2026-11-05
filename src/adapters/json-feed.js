@@ -245,7 +245,42 @@ function normalizeZxearn(row, source) {
   };
 }
 
+/** The feed lists withdrawals separately, so only completed offers are read. */
+function jjrewardRows(data) {
+  return Array.isArray(data?.completedOffers) ? data.completedOffers : [];
+}
+
+/**
+ * The feed hides usernames and has no time, so rows are dated when first fetched.
+ * @param {Record<string, unknown>} row
+ * @param {Record<string, unknown>} source
+ * @returns {import('../types.js').FeedEvent}
+ */
+function normalizeJjreward(row, source) {
+  const offerwall = firstText(row.partners, "Offer");
+  const offerName = firstText(row.offer_name, "Offer");
+  const reward = asNumber(row.reward);
+  const id = String(row.id || hashId(String(source.id), [offerwall, offerName, reward]));
+
+  return {
+    id: `${source.id}-${id}`,
+    source: String(source.id),
+    sourceName: String(source.name),
+    user: "anonymous",
+    offer: truncate(`${offerwall} -> ${offerName}`),
+    offerwall,
+    offerName: truncate(offerName),
+    country: row.country ? String(row.country) : null,
+    isPrivate: true,
+    amount: reward,
+    unit: "coins",
+    rawAmount: `${reward.toLocaleString()} coins`,
+    at: new Date().toISOString(),
+  };
+}
+
 const schemas = {
+  jjreward: { rows: jjrewardRows, normalize: normalizeJjreward },
   zxearn: { rows: zxearnRows, normalize: normalizeZxearn },
   rubcashly: { rows: goldtaskerRows, normalize: normalizeRubcashly },
   goldtasker: { rows: goldtaskerRows, normalize: normalizeGoldtasker },

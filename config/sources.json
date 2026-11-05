@@ -238,5 +238,17 @@
     "color": "#ec4899",
     "pollSeconds": 45,
     "limit": 40
+  },
+  {
+    "id": "jjreward",
+    "name": "JJReward",
+    "enabled": true,
+    "type": "json-feed",
+    "schema": "jjreward",
+    "url": "https://jjreward.com/api/getWithdrawAndCompletedOffers",
+    "referer": "https://jjreward.com/",
+    "color": "#3b82f6",
+    "pollSeconds": 30,
+    "limit": 40
   }
 ]
