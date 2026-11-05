@@ -225,5 +225,17 @@
     "color": "#eab308",
     "pollSeconds": 45,
     "limit": 30
+  },
+  {
+    "id": "crazycash",
+    "name": "CrazyCash",
+    "enabled": true,
+    "type": "swiper-csm-feed",
+    "url": "https://www.crazycash.co/earn",
+    "feedType": "offer",
+    "proxyFallback": false,
+    "color": "#ec4899",
+    "pollSeconds": 45,
+    "limit": 40
   }
 ]
