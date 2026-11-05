@@ -261,5 +261,17 @@
     "color": "#14b8a6",
     "pollSeconds": 60,
     "limit": 35
+  },
+  {
+    "id": "coinlycash",
+    "name": "CoinlyCash",
+    "enabled": true,
+    "type": "json-feed",
+    "schema": "goldtasker",
+    "url": "https://coinlycash.com/api/live-offers",
+    "referer": "https://coinlycash.com/",
+    "color": "#8b5cf6",
+    "pollSeconds": 45,
+    "limit": 40
   }
 ]
