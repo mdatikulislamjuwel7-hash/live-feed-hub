@@ -267,6 +267,8 @@ function normalizeJjreward(row, source) {
     source: String(source.id),
     sourceName: String(source.name),
     user: "anonymous",
+    // Every user is anonymous, so the row id keeps separate completions from being merged as duplicates.
+    userId: id,
     offer: truncate(`${offerwall} -> ${offerName}`),
     offerwall,
     offerName: truncate(offerName),
