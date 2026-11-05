@@ -50,6 +50,8 @@
     "schema": "zxearn",
     "url": "https://zxearn.com/api/v1/public/live-activity",
     "referer": "https://zxearn.com/",
+    "fetchRetries": 2,
+    "timeoutMs": 10000,
     "color": "#e11d48",
     "pollSeconds": 45,
     "limit": 40

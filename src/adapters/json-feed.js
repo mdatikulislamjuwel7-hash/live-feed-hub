@@ -291,6 +291,37 @@ const schemas = {
   paidkash: { rows: paidkashRows, normalize: normalizePaidkash },
 };
 
+/** Node reports every network failure as "fetch failed" and keeps the reason in `cause`. */
+function networkErrorText(err) {
+  const message = err instanceof Error ? err.message : String(err);
+  const cause = err instanceof Error ? err.cause : null;
+  const detail = cause?.code || cause?.message;
+  return detail ? `${message} (${detail})` : message;
+}
+
+/**
+ * Retries network failures only. An HTTP response, including a block such as 403, is returned as is.
+ * @param {Record<string, unknown>} source
+ */
+async function fetchWithRetry(source) {
+  const retries = Math.max(0, Number(source.fetchRetries) || 0);
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await fetch(String(source.url), {
+        headers: {
+          Accept: "application/json",
+          Referer: String(source.referer || new URL(String(source.url)).origin),
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) LiveFeedHub/1.0",
+        },
+        signal: AbortSignal.timeout(Number(source.timeoutMs) || 25000),
+      });
+    } catch (err) {
+      if (attempt >= retries) throw new Error(`${source.name}: ${networkErrorText(err)}`);
+      await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)));
+    }
+  }
+}
+
 /**
  * @param {Record<string, unknown>} source
  * @returns {Promise<import('../types.js').FeedEvent[]>}
@@ -299,14 +330,7 @@ export async function fetchJsonFeed(source) {
   const schema = schemas[String(source.schema || source.id)];
   if (!schema) throw new Error(`${source.name}: unknown json-feed schema`);
 
-  const res = await fetch(String(source.url), {
-    headers: {
-      Accept: "application/json",
-      Referer: String(source.referer || new URL(String(source.url)).origin),
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) LiveFeedHub/1.0",
-    },
-    signal: AbortSignal.timeout(Number(source.timeoutMs) || 25000),
-  });
+  const res = await fetchWithRetry(source);
 
   if (!res.ok) throw new Error(`${source.name}: HTTP ${res.status}`);
   const data = await res.json();
