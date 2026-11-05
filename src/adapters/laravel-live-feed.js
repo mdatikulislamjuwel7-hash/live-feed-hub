@@ -375,7 +375,7 @@ async function fetchLiveLeads(source) {
   const snap = JSON.parse(decodeAttr(first.snapshot));
   const leads = unwrapLivewireArray(snap?.data?.liveLeads);
   if (!leads.length) throw new Error(`${source.name}: no live leads returned`);
-  return parseLiveLeads(leads, source);
+  return parseLiveLeads(source.skipCashouts ? leads.filter((lead) => !lead.is_cashout) : leads, source);
 }
 
 /**

@@ -213,5 +213,17 @@
     "color": "#fb923c",
     "pollSeconds": 45,
     "limit": 40
+  },
+  {
+    "id": "cointo",
+    "name": "Cointo",
+    "enabled": true,
+    "type": "laravel-live-feed",
+    "url": "https://cointo.co/earn",
+    "laravelMode": "live-leads",
+    "skipCashouts": true,
+    "color": "#eab308",
+    "pollSeconds": 45,
+    "limit": 30
   }
 ]
