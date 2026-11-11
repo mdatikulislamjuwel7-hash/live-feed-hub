@@ -299,7 +299,8 @@ function parseLiveCashoutCards(html, source) {
     if (seen.has(semantic)) return;
     seen.add(semantic);
 
-    const id = hashId(String(source.id), [user, offerwall, offerName, amount, timeText || at.slice(0, 10)]);
+    // No time in the id: "4 hours ago" becomes "5 hours ago" and would re-add the same card as new.
+    const id = hashId(String(source.id), [user, offerwall, offerName, amount]);
     events.push({
       id: `${source.id}-${id}`,
       source: String(source.id),
@@ -420,6 +421,16 @@ export async function fetchLaravelLiveFeed(source) {
   else if (mode === "live-cashouts") events = await fetchLiveCashouts(source);
   else if (mode === "cashout-list") events = await fetchCashoutList(source);
   else throw new Error(`${source.name}: unknown laravelMode "${mode}"`);
+
+  const blocked = Array.isArray(source.blockOfferPatterns)
+    ? source.blockOfferPatterns.map((pattern) => String(pattern).toLowerCase())
+    : [];
+  if (blocked.length) {
+    events = events.filter((event) => {
+      const text = `${event.offerwall} ${event.offerName}`.toLowerCase();
+      return !blocked.some((pattern) => text.includes(pattern));
+    });
+  }
 
   return events.slice(0, Number(source.limit) || 40);
 }

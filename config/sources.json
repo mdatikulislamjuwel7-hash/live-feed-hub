@@ -118,6 +118,7 @@
     "type": "laravel-live-feed",
     "url": "https://boostlyearn.com/",
     "laravelMode": "live-cashouts",
+    "blockOfferPatterns": ["binance", "cashout"],
     "color": "#a855f7",
     "pollSeconds": 45,
     "limit": 30
