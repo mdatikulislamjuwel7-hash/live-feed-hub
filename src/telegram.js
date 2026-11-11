@@ -23,7 +23,13 @@ const topCoinsPinLimit = Math.min(
 const highCoinAmount = Number(process.env.TELEGRAM_HIGH_COIN_AMOUNT || 1000);
 const highUsdAmount = Number(process.env.TELEGRAM_HIGH_USD_AMOUNT || 10);
 const divider = "━━━━━━━━━━━━━━━━";
-const alertSendDelayMs = Math.max(300, Number(process.env.TELEGRAM_ALERT_DELAY_MS || 500));
+// Telegram allows about 1 message per second per chat and 20 per minute in a group;
+// sending faster gets HTTP 429 and a cooldown, so alerts are paced and grouped.
+const alertSendDelayMs = Math.max(300, Number(process.env.TELEGRAM_ALERT_DELAY_MS || 3100));
+const alertsPerMessage = Math.min(10, Math.max(1, Number(process.env.TELEGRAM_ALERTS_PER_MESSAGE || 4)));
+const maxMessageChars = 3800;
+const maxQueuedAlerts = 500;
+const maxSendAttempts = 5;
 const alertDedupeMs = Math.max(1, Number(process.env.TELEGRAM_ALERT_DEDUPE_HOURS || 24)) * 60 * 60 * 1000;
 const minCoinAlertAmount = Math.max(0, Number(process.env.TELEGRAM_MIN_COIN_AMOUNT || 200));
 // These sources pay in much smaller units, so the coin minimum would hide all their rows.
@@ -145,23 +151,66 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Takes up to `alertsPerMessage` queued alerts for one chat that fit in one Telegram message. */
+function takeAlertBatch() {
+  const first = alertQueue.shift();
+  if (!first) return null;
+  const texts = [first.text];
+  let length = first.text.length;
+  while (
+    texts.length < alertsPerMessage &&
+    alertQueue.length &&
+    alertQueue[0].targetChatId === first.targetChatId &&
+    length + alertQueue[0].text.length + 1 <= maxMessageChars
+  ) {
+    const next = alertQueue.shift();
+    texts.push(next.text);
+    length += next.text.length + 1;
+  }
+  return { text: texts.join("\n"), targetChatId: first.targetChatId, count: texts.length };
+}
+
+async function sendAlertBatch(batch) {
+  for (let attempt = 1; attempt <= maxSendAttempts; attempt += 1) {
+    try {
+      await sendTelegramMessage(batch.text, batch.targetChatId);
+      return;
+    } catch (err) {
+      const retryAfter = Number(err?.retryAfter || 0);
+      if (!retryAfter || attempt === maxSendAttempts) {
+        console.warn(
+          `[telegram] dropped ${batch.count} alert(s): ${err instanceof Error ? err.message : String(err)}`
+        );
+        return;
+      }
+      console.warn(`[telegram] rate limited, retrying ${batch.count} alert(s) in ${retryAfter}s`);
+      await sleep(Math.min(retryAfter, 300) * 1000 + 500);
+    }
+  }
+}
+
 function queueTelegramAlert(text, targetChatId = chatId) {
   if (!token || !targetChatId) return;
   alertQueue.push({ text, targetChatId });
+  if (alertQueue.length > maxQueuedAlerts) {
+    alertQueue.splice(0, alertQueue.length - maxQueuedAlerts);
+    console.warn(`[telegram] alert queue full, kept the newest ${maxQueuedAlerts}`);
+  }
   if (alertQueueRunning) return;
   alertQueueRunning = true;
   (async () => {
-    while (alertQueue.length) {
-      const item = alertQueue.shift();
-      if (!item) continue;
-      try {
-        await sendTelegramMessage(item.text, item.targetChatId);
-      } catch (err) {
-        console.warn(`[telegram] ${err instanceof Error ? err.message : String(err)}`);
+    try {
+      // Let the rest of the same poll's alerts arrive so they can share a message.
+      await sleep(200);
+      while (alertQueue.length) {
+        const batch = takeAlertBatch();
+        if (!batch) continue;
+        await sendAlertBatch(batch);
+        if (alertQueue.length) await sleep(alertSendDelayMs);
       }
-      if (alertQueue.length) await sleep(alertSendDelayMs);
+    } finally {
+      alertQueueRunning = false;
     }
-    alertQueueRunning = false;
   })();
 }
 
@@ -213,7 +262,15 @@ export async function sendTelegramMessage(text, targetChatId = chatId, extra = {
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`Telegram HTTP ${res.status}: ${body.slice(0, 180)}`);
+    const error = new Error(`Telegram HTTP ${res.status}: ${body.slice(0, 180)}`);
+    if (res.status === 429) {
+      let retryAfter = 0;
+      try {
+        retryAfter = Number(JSON.parse(body)?.parameters?.retry_after) || 0;
+      } catch {}
+      error.retryAfter = retryAfter || 5;
+    }
+    throw error;
   }
   const json = await res.json().catch(() => null);
   return json?.result || null;
